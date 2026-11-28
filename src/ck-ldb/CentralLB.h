@@ -225,6 +225,13 @@ public:
   void preprocess(LDStats* stats);
   virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
+  // The two halves of the base Strategy: the compute (work) and the decision
+  // message. With a helper thread configured (LBOffThread.h) and
+  // strategyOffThreadOk set, the compute runs on the helper while this PE keeps
+  // scheduling, and strategyFinishOffThread continues on the PE.
+  void strategyCompute(LDStats* stats);
+  LBMigrateMsg* strategyFinish(LDStats* stats);
+  void strategyFinishOffThread(LDStats* stats);
 	virtual void changeFreq(int n);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
@@ -247,6 +254,10 @@ protected:
   void loadbalance_with_thread() { use_thread = true; }
 
   bool concurrent;
+  // The balancer's work() reads nothing but its stats and process-wide state
+  // (no Ckpv, no PE-bound calls), so it may run on the LB helper thread; and it
+  // does not override Strategy, which the helper path bypasses. Off by default.
+  bool strategyOffThreadOk = false;
 private:  
   int myspeed;
   int stats_msg_count;

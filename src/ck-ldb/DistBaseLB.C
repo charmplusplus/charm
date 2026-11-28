@@ -16,6 +16,18 @@ void DistBaseLB::barrierDone() {
   }
   lb_started = true;
 
+  // Hold the AtSync barrier down for the duration of the step, as CentralLB
+  // does. This is what makes the framework one step at a time: while a step is
+  // registering, the barrier cannot fire, so no element can start the next
+  // one. Under the unsplit AtSync that never mattered, because the elements
+  // stayed stopped for the whole step; under +LBAsync they keep running.
+  // Released in ResumeClients.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->RegisteringObjects(h);
+  }
+
   start_lb_time = 0;
 
   if (CkNumPes() == 1) {
@@ -129,8 +141,17 @@ void DistBaseLB::LoadBalance() {
 #endif  
 }
 
+// Under +LBSyncResume (which +LBAsync forces) a step ends on the move ledger:
+// each source PE holds its share of the global resume until every move it
+// issued has been acked by the element's registration at its destination
+// (ProcessMigrationDecision), and the global resume therefore waits for every
+// arrival. Without the global resume each PE resumes on its own, so a
+// destination must count its own arrivals in.
+static bool useMoveLedger() { return _lb_args.syncResume(); }
+
 void DistBaseLB::Migrated(int waitBarrier) {
   migrates_completed++;
+  if (useMoveLedger()) return;  // a diagnostic count; the ledger ends the step
   if (migrates_completed == migrates_expected && lb_started) {
     MigrationDone(1);
   }
@@ -145,6 +166,12 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   strat_end_time = CkWallTimer() - strat_start_time;
   const int me = CkMyPe();
 
+  // Every lbmgr->Migrate below reaches CkLocRec::recvMigrate synchronously,
+  // which records the move in this ledger by element identity, before any
+  // deferral.
+  const bool ledger = useMoveLedger();
+  if (ledger) lbmgr->ledgerOpen(step());
+
   // Migrate messages from me to elsewhere
   for(int i=0; i < migrateMsg->n_moves; i++) {
     MigrateInfo& move = migrateMsg->moves[i];
@@ -153,7 +180,11 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
         CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
             CkMyPe());
       }
-      lbmgr->Migrate(move.obj,move.to_pe);
+      // Under the ledger a move that cannot be made is simply never recorded;
+      // under arrival counts its destination would wait for it forever.
+      if (lbmgr->Migrate(move.obj,move.to_pe) == 0 && !ledger)
+        CkAbort("[%d] %s: object to move to PE %d is no longer registered\n", me,
+                lbName(), move.to_pe);
     } else if (move.from_pe != me) {
       CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n",
           me,move.from_pe,move.to_pe);
@@ -166,6 +197,21 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
     if (_lb_args.debug())
       CkPrintf("%s> Strategy took %fs memory usage: %f MB.\n", lbName(),
           strat_end_time - strat_start_time, CmiMemoryUsage()/(1024.0*1024.0));
+  }
+
+  // The message is this function's to free: its caller builds it, hands it
+  // over and forgets it. Freed before MigrationDone, which can run the whole
+  // tail of the step.
+  delete migrateMsg;
+
+  if (ledger) {
+    // Every move is issued. This PE's part of the step is over once each one
+    // has registered at its destination -- deferred ones included. Fires at
+    // once when there is nothing outstanding.
+    lbmgr->ledgerClose([this]() {
+      if (lb_started) MigrationDone(1);
+    });
+    return;
   }
 
   // If all the expected objs have migrated in, then migration is done
@@ -210,6 +256,17 @@ void DistBaseLB::ResumeClients(int balancing) {
   }
 
   lbmgr->ResumeClients();
+
+  // Release the barrier only after the clients have been resumed, matching
+  // CentralLB::CheckMigrationComplete: turning it on any earlier would let an
+  // element still running under +LBAsync start the next step while this one
+  // was finishing. Unconditional, to pair with the RegisteringObjects in
+  // barrierDone: every step reaches here once, the one-PE path included.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->DoneRegisteringObjects(h);
+  }
 #endif
 }
 

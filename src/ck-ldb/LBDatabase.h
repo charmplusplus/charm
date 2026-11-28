@@ -143,9 +143,8 @@ public:
     else return 0;
   }
 
-  inline void GetCommData(LDCommData *data) {
-    if (commTable) commTable->GetCommData(data);
-  }
+  // Traffic scaled by each sender's sampling factor (see GetObjData).
+  void GetCommData(LDCommData *data);
 
   inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes) {
     if (commTable)
@@ -169,6 +168,9 @@ public:
   void UnregisterObj(LDObjHandle h);
   void EstObjLoad(const LDObjHandle &h, double cpuload);
   void EstObjGPULoad(const LDObjHandle &h, double gpuload);
+  // The object joined (true) or left (false) the current balancing step: its
+  // measurement window closes or opens (LBObj::setJoinedStep).
+  void SetObjJoinedStep(const LDObjHandle &h, bool joined);
   void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
   void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
   void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);
@@ -176,6 +178,18 @@ public:
                LBRealType *idletime, LBRealType *bg_walltime,
                LBRealType *bg_cputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
+
+  // Sum of this PE's per-object GPU loads as they stand now. Meaningful only
+  // after SetObjGPULoad has copied a normalized round in; MetaBalancer reports
+  // it as this PE's share of its device's load between balancing steps.
+  inline LBRealType GetTotalObjGPULoad(void) const {
+    LBRealType total = 0.0;
+#if CMK_CUDA
+    for (const LBObjEntry &e : objs)
+      if (e.obj != nullptr) total += e.obj->data.gpuTime;
+#endif
+    return total;
+  }
 
   inline void ObjectStart(const LDObjHandle &h) {
     if (StatsOn()) {

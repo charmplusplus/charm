@@ -10,11 +10,61 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#include "LBOffThread.h"
 
 #if CMK_CUDA
 #include "hapi.h"
 #include "gpumanager.h"
 CsvExtern(GPUManager, gpu_manager);
+#endif
+
+#if CMK_LBDB_ON && LB_HELPER_AVAILABLE
+// Work handed to the LB helper thread (LBOffThread.h), polled for from the
+// scheduler loop.
+namespace {
+// The strategy's compute half. Only one at a time per process.
+struct StrategyJob {
+  CentralLB* lb;
+  BaseLB::LDStats* stats;
+  std::atomic<bool> done;
+  StrategyJob(CentralLB* l, BaseLB::LDStats* s) : lb(l), stats(s), done(false) {}
+};
+std::atomic<bool> g_strategyInFlight{false};
+
+void strategyPoll(void* arg) {
+  StrategyJob* j = (StrategyJob*)arg;
+  if (!j->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, arg);
+    return;
+  }
+  CentralLB* lb = j->lb;
+  BaseLB::LDStats* stats = j->stats;
+  delete j;
+  g_strategyInFlight.store(false);
+  lb->strategyFinishOffThread(stats);
+}
+
+#if CMK_CUDA
+// The round's CUPTI load build, then the fan-out to the process's PEs.
+struct CuptiBuildJob {
+  CkGroupID gid;
+  int first, count;
+  std::atomic<bool> done;
+  CuptiBuildJob(CkGroupID g, int f, int c) : gid(g), first(f), count(c), done(false) {}
+};
+
+void cuptiBuildPoll(void* arg) {
+  CuptiBuildJob* b = (CuptiBuildJob*)arg;
+  if (!b->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, arg);
+    return;
+  }
+  CProxy_CentralLB proxy(b->gid);
+  for (int r = 0; r < b->count; r++) proxy[b->first + r].gpuLoadsReady();
+  delete b;
+}
+#endif
+}  // namespace
 #endif
 
 #define  DEBUGF(x)       // CmiPrintf x;
@@ -57,7 +107,9 @@ static void lbinit()
   LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class", false);
 }
 
-static int broadcastThreshold = 32;
+// A span of at most this many PEs gets the decision by broadcast rather than by
+// scatter (+LBScatterThreshold, default 32).
+static inline int broadcastThreshold() { return _lb_args.scatterThreshold(); }
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
@@ -160,6 +212,25 @@ void CentralLB::InvokeLB()
   // kernel the other PEs' objects were still finishing. The earlier arrivals
   // continue from gpuLoadsReady.
   if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+#if LB_HELPER_AVAILABLE
+  {
+    // Parsing the round's CUPTI records can take tens of milliseconds; on the
+    // helper thread this PE keeps scheduling meanwhile, which matters under
+    // +LBAsync, where its elements are still running.
+    static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
+    cpu_set_t cpus;
+    if (lbOffThreadCpus(spec, &cpus)) {
+      CuptiBuildJob* b =
+          new CuptiBuildJob(thisgroup, CkNodeFirst(CkMyNode()), CkNodeSize(CkMyNode()));
+      lbHelperSubmit(cpus, [b]() {
+        hapiPrepareCuptiLoads();
+        b->done.store(true, std::memory_order_release);
+      });
+      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
+      return;
+    }
+  }
+#endif
   hapiPrepareCuptiLoads();
   const int first = CkNodeFirst(CkMyNode());
   for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
@@ -668,9 +739,43 @@ void CentralLB::LoadBalance()
 //      }
   }
   
+#if LB_HELPER_AVAILABLE
+  {
+    // The strategy's compute on the helper thread: this PE goes on delivering
+    // messages to its own elements meanwhile, which under +LBAsync keeps their
+    // neighbours from waiting on them for the length of the strategy.
+    static const char* spec = lbHelperSpec("CHARM_LB_STRATEGY_THREAD");
+    cpu_set_t cpus;
+    if (strategyOffThreadOk && !concurrent && !use_thread && !g_strategyInFlight.load() &&
+        lbOffThreadCpus(spec, &cpus)) {
+      g_strategyInFlight.store(true);
+      strat_start_time = CkWallTimer();
+      StrategyJob* j = new StrategyJob(this, statsData);
+      lbHelperSubmit(cpus, [j]() {
+        j->lb->strategyCompute(j->stats);
+        j->done.store(true, std::memory_order_release);
+      });
+      CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, (void*)j);
+      return;  // strategyFinishOffThread applies the decision
+    }
+  }
+#endif
   storedMigrateMsg = Strategy(statsData);
 
   if (!concurrent) ApplyDecision(); // immediately apply the migration decision
+#endif
+}
+
+// The strategy's compute finished on the helper thread: the decision message
+// reads PE-local state, so it is built here, on the PE.
+void CentralLB::strategyFinishOffThread(LDStats* stats)
+{
+#if CMK_LBDB_ON
+  if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
+    CkPrintf("CharmLB> %s: strategy ran %.1f ms on the helper thread\n", lbname,
+             (CkWallTimer() - strat_start_time) * 1e3);
+  storedMigrateMsg = strategyFinish(stats);
+  if (!concurrent) ApplyDecision();
 #endif
 }
 
@@ -715,22 +820,19 @@ void CentralLB::ApplyDecision() {
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 
+  // +LBPeerDecision (forced on by +LBAsync) sends each PE only the moves it is
+  // the source of, plus its own arrival counts, down a tree, instead of
+  // broadcasting the whole decision to everyone. Up to broadcastThreshold() PEs
+  // InitiateScatter broadcasts anyway.
 #if CMK_SCATTER_LB_RESULTS
-  InitiateScatter(migrateMsg);
+  const bool scatter = true;
 #else
-  if (1) {
-      // broadcast
-    thisProxy.ReceiveMigration(migrateMsg);
-  }
-  else {
-    // split the migration for each processor
-    for (int p=0; p<CkNumPes(); p++) {
-      LBMigrateMsg *m = extractMigrateMsg(migrateMsg, p);
-      thisProxy[p].ReceiveMigration(m);
-    }
-    delete migrateMsg;
-  }
+  const bool scatter = _lb_args.lbPeerDecision();
 #endif
+  if (scatter)
+    InitiateScatter(migrateMsg);
+  else
+    thisProxy.ReceiveMigration(migrateMsg);
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
   statsData->clear();
@@ -745,7 +847,7 @@ void CentralLB::t_LoadBalance()
 
 void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
-  if (CkNumPes() <= broadcastThreshold) {
+  if (CkNumPes() <= broadcastThreshold()) {
     thisProxy.ReceiveMigration(msg);
     return;
   }
@@ -754,17 +856,21 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
   // allocate maximum possible size to avoid later copies
   // the messages will be resized before sending
-  LBScatterMsg *leftMsg = new (middlePe, msg->n_moves)
+  LBScatterMsg *leftMsg = new (middlePe, middlePe, msg->n_moves)
     LBScatterMsg(0, middlePe - 1);
-  LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
+  LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, CkNumPes() - middlePe, msg->n_moves)
     LBScatterMsg(middlePe, CkNumPes() - 1);
+  leftMsg->next_lb = rightMsg->next_lb = msg->next_lb;
 
   int *migrateTally = new int[CkNumPes()];
   memset(migrateTally, 0, CkNumPes() * sizeof(int));
+  int *futureTally = new int[CkNumPes()];
+  memset(futureTally, 0, CkNumPes() * sizeof(int));
 
   for (int i = 0; i < msg->n_moves; i++) {
     MigrateInfo* item = (MigrateInfo*) &msg->moves[i];
-    migrateTally[item->to_pe]++;
+    if (item->async_arrival) futureTally[item->to_pe]++;
+    else migrateTally[item->to_pe]++;
     if (item->from_pe < middlePe) {
       leftMsg->moves[leftMsg->numMigrates++] = *item;
     }
@@ -775,8 +881,12 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
   memcpy(leftMsg->numMigratesPerPe, migrateTally, middlePe * sizeof(int));
   memcpy(rightMsg->numMigratesPerPe, &migrateTally[middlePe], (CkNumPes() - middlePe) * sizeof(int));
+  memcpy(leftMsg->numFutureMigratesPerPe, futureTally, middlePe * sizeof(int));
+  memcpy(rightMsg->numFutureMigratesPerPe, &futureTally[middlePe],
+         (CkNumPes() - middlePe) * sizeof(int));
 
   delete [] migrateTally;
+  delete [] futureTally;
 
   // shrink the size of the messages
   envelope *env = UsrToEnv(rightMsg);
@@ -802,13 +912,16 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
     CkAssert(msg->firstPeInSpan == CkMyPe());
     int numPesInSpan = msg->lastPeInSpan - msg->firstPeInSpan + 1 ;
 
-    if (numPesInSpan <= broadcastThreshold) {
+    if (numPesInSpan <= broadcastThreshold()) {
       for (int i = msg->firstPeInSpan; i < msg->lastPeInSpan; i++) {
         // TODO: multicast without allocating new message each time
-        LBScatterMsg *msgCopy = new (numPesInSpan, msg->numMigrates)
+        LBScatterMsg *msgCopy = new (numPesInSpan, numPesInSpan, msg->numMigrates)
           LBScatterMsg(msg->firstPeInSpan, msg->lastPeInSpan);
         msgCopy->numMigrates = msg->numMigrates;
+        msgCopy->next_lb = msg->next_lb;
         memcpy(msgCopy->numMigratesPerPe, msg->numMigratesPerPe,
+               numPesInSpan * sizeof(int));
+        memcpy(msgCopy->numFutureMigratesPerPe, msg->numFutureMigratesPerPe,
                numPesInSpan * sizeof(int));
         memcpy(msgCopy->moves, msg->moves,
                msg->numMigrates * sizeof(MigrateDecision));
@@ -825,8 +938,9 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
       int numMigrates = leftMsg->numMigrates;
       int numPesInRightSpan = leftMsg->lastPeInSpan - middlePe + 1;
       LBScatterMsg *rightMsg =
-        new (numPesInRightSpan, leftMsg->numMigrates)
+        new (numPesInRightSpan, numPesInRightSpan, leftMsg->numMigrates)
         LBScatterMsg(middlePe, leftMsg->lastPeInSpan);
+      rightMsg->next_lb = leftMsg->next_lb;
       leftMsg->numMigrates = 0;
       leftMsg->lastPeInSpan = middlePe - 1;
       for (int i = 0; i < numMigrates; i++) {
@@ -840,6 +954,9 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
 
       memcpy(rightMsg->numMigratesPerPe,
              &leftMsg->numMigratesPerPe[middlePe - leftMsg->firstPeInSpan],
+             (numPesInRightSpan) * sizeof(int));
+      memcpy(rightMsg->numFutureMigratesPerPe,
+             &leftMsg->numFutureMigratesPerPe[middlePe - leftMsg->firstPeInSpan],
              (numPesInRightSpan) * sizeof(int));
 
       // shrink the size of the messages
@@ -999,8 +1116,14 @@ void CentralLB::ProcessMigrationDecision() {
   LBScatterMsg *m = storedScatterMsg;
   CkAssert(m != NULL);
 
-  migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
-  future_migrates_expected = 0;
+  // Each PE is told only its own two arrival counts, which is all
+  // ProcessReceiveMigration ever derives from the full move list. Every
+  // destination has them before any source moves anything: this runs from the
+  // reduction in ReceiveMigration, which every PE reaches first.
+  const int myIdx = CkMyPe() - m->firstPeInSpan;
+  migrates_expected = m->numMigratesPerPe[myIdx];
+  future_migrates_expected = m->numFutureMigratesPerPe[myIdx];
+  cur_ld_balancer = m->next_lb;
 
   for(int i = 0; i < m->numMigrates; i++) {
     MigrateDecision& move = m->moves[i];
@@ -1014,9 +1137,11 @@ void CentralLB::ProcessMigrationDecision() {
       // migrate object, in case it is already gone, inform toPe
       LDObjHandle objInfo = lbmgr->GetObjHandle(move.dbIndex);
 
-      if (lbmgr->Migrate(objInfo,move.toPe) == 0) {
-        CkAbort("Error: Async arrival not supported in scattering mode\n");
-      }
+      // The object died between the statistics this decision was planned from
+      // and now: tell the destination to stop expecting it, as the broadcast
+      // path does.
+      if (lbmgr->Migrate(objInfo,move.toPe) == 0)
+        thisProxy[move.toPe].MissMigrate(!move.asyncArrival);
     }
   }
 
@@ -1342,6 +1467,18 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
   strat_start_time = CkWallTimer();
+  strategyCompute(stats);
+  return strategyFinish(stats);
+#else
+  return NULL;
+#endif
+}
+
+// On the helper thread this runs off any PE: CkMyPe() reads 0 there, so the
+// prints below keyed on the decision PE still appear when that PE is 0.
+void CentralLB::strategyCompute(LDStats* stats)
+{
+#if CMK_LBDB_ON
   if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
     CkPrintf("CharmLB> %s: PE [%d] strategy starting at %f\n", lbname, cur_ld_balancer, strat_start_time);
 
@@ -1353,7 +1490,12 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     for (const auto& val : stats->to_proc) CkPrintf("%d ", val);
     CkPrintf("\n");
   }
+#endif
+}
 
+LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
+{
+#if CMK_LBDB_ON
   if (concurrent) return NULL;  // migrate msg will only be created on PE with best solution
 
   LBMigrateMsg *msg = createMigrateMsg(stats);

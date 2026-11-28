@@ -5,6 +5,7 @@
 #include <queue>
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <atomic>
 #include <vector>
@@ -426,6 +427,22 @@ void hapiCuptiInit() { hapiCuptiStartTracing(); }
 // count.
 static thread_local bool cupti_pe_tracing = false;
 
+// +LBAsync: the flushes below run while other PEs of the process keep
+// launching kernels. CUPTI_ACTIVITY_FLAG_FLUSH_FORCED hands back buffers that
+// still hold incomplete records, and CUPTI completes such a record later from
+// inside whatever CUDA call comes next on any thread -- by writing into a
+// buffer hapiProcessCuptiBuffers has already freed. A plain flush returns only
+// completed buffers. Its price: the kernels in the buffer still being filled
+// are read a round late.
+static std::atomic<bool> cupti_async_lb{false};
+
+void hapiCuptiSetAsyncLB(bool on) { cupti_async_lb.store(on, std::memory_order_relaxed); }
+
+static inline uint32_t hapiCuptiFlushFlag() {
+  return cupti_async_lb.load(std::memory_order_relaxed) ? 0 /* plain flush */
+                                                        : CUPTI_ACTIVITY_FLAG_FLUSH_FORCED;
+}
+
 void hapiCuptiStartTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
   // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
@@ -481,7 +498,7 @@ void hapiCuptiStopTracing() {
   // drives the buffer-completed callback, which takes cupti_queue_lock_ -- a
   // different mutex from the one held here, so this cannot deadlock.
   gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
-  CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  CUPTI_SAFE_CALL(cuptiActivityFlushAll(hapiCuptiFlushFlag()));
 
   // Deliberately NOT detaching with cuptiFinalize(). Staying attached costs
   // ~1.3 ms per step even with every kind disabled, and detaching measured
@@ -517,6 +534,7 @@ void hapiCuptiFinalize() {}
 void hapiCuptiStartTracing() {}
 void hapiCuptiStopTracing() {}
 bool hapiCuptiTracingActive() { return false; }
+void hapiCuptiSetAsyncLB(bool) {}
 
 #endif /* HAPI_CUPTI_LB */
 #endif /* CMK_CUDA && CMK_LBDB_ON */
@@ -1146,9 +1164,10 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   //
   // FLUSH_FORCED rather than a plain flush: without it CUPTI hands back only
   // the buffers it considers complete, and the kernel records still sitting in
-  // a partly-filled buffer are read a round late or not at all.
+  // a partly-filled buffer are read a round late or not at all. Not under
+  // +LBAsync, where it is unsafe (see hapiCuptiFlushFlag).
   if (hapiCuptiTracingActive())
-    CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+    CUPTI_SAFE_CALL(cuptiActivityFlushAll(hapiCuptiFlushFlag()));
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
@@ -2771,6 +2790,33 @@ static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
   }
 }
 
+// Objects on this PE that have joined the current load balancing step.
+//
+// The measurement window closes per object, at its own join, not per PE: a
+// PE-wide switch closed at the first join would stop measuring every object
+// that has not joined yet, and closed at the barrier it lets the early joiners
+// run ahead. Under the unsplit barrier the distinction does not exist -- a
+// joined element waits and does no more work -- but under +LBAsync it keeps
+// running, and the kernels it launches after joining belong to the next
+// round, not to the load the strategy reads. Pushing the no-object sentinel
+// for such an object leaves those kernels in cupti_unattributed_kernels_: they
+// still count as device occupancy but are billed to no object.
+static thread_local std::unordered_set<LDObjKey, LDObjKeyHash> cupti_joined_objects;
+
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle) {
+  LDObjKey key;
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  cupti_joined_objects.insert(key);
+}
+
+void hapiCuptiObjectResumed(const LDObjHandle& handle) {
+  LDObjKey key;
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  cupti_joined_objects.erase(key);
+}
+
 uint64_t hapiCuptiPushObjCorrelation() {
   GPUManager& gm = CsvAccess(gpu_manager);
   // Gated on tracing rather than initialization: this runs on every entry
@@ -2793,7 +2839,10 @@ uint64_t hapiCuptiPushObjCorrelation() {
     // time this PE runs a given object, so it costs O(objects that ever run
     // here) acquisitions rather than one per entry method.
     auto cached = cupti_local_object_tokens.find(key);
-    if (cached != cupti_local_object_tokens.end()) {
+    if (!cupti_joined_objects.empty() &&
+        cupti_joined_objects.find(key) != cupti_joined_objects.end()) {
+      // Joined the step already: its kernels are left unattributed (above).
+    } else if (cached != cupti_local_object_tokens.end()) {
       object_token = cached->second;
     } else {
       {
@@ -2837,6 +2886,8 @@ void hapiCuptiPopObjCorrelation() {
 
 uint64_t hapiCuptiPushObjCorrelation() { return 0; }
 void hapiCuptiPopObjCorrelation() {}
+void hapiCuptiObjectJoinedStep(const LDObjHandle&) {}
+void hapiCuptiObjectResumed(const LDObjHandle&) {}
 
 #endif /* HAPI_CUPTI_LB */
 #endif /* CMK_CUDA && CMK_LBDB_ON */

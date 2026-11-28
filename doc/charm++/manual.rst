@@ -3398,6 +3398,16 @@ option to specify the load balancing strategy to use. Metabalancer
 relies on the AtSync() calls specified in Section :numref:`lbarray`
 to collect load statistics.
 
+On a GPU build, *+MetaLBGpuTrigger* makes Metabalancer decide from the
+device loads instead: it balances when the most loaded device carries
+more than *+MetaLBGpuTolerance* ``<ratio>`` (default 1.1) times the mean
+device load. The loads are sampled through ``AtSyncSample()``, which an
+element calls every few iterations; every element calls
+``AtSyncStart()``/``AtSyncWait()`` every iteration, and once an
+imbalance is seen all elements join the step at the same iteration,
+agreed among the PEs before anyone joins. ``AtSyncStart()`` returns
+``Blocked`` while that agreement is in progress.
+
 *+MetaLBModelDir* ``<path-to-model>`` can be used to invoke the
 Metabalancer feature to automatically decide which load balancing
 strategy to invoke. A model trained on a generic representative load
@@ -3499,6 +3509,56 @@ The detailed APIs of these two methods are described as follows:
    checkpoint records each PE's mode and a restart restores it; a
    restart on a different number of PEs gives every PE the mode PE 0
    had.
+
+   ``AtSync()`` is two calls made back to back, which an element can
+   also make itself, with work of its own in between:
+
+   -  ``AtSyncStart()`` joins the balancing step if one is due and
+      returns what it did: ``AtSyncStatus::Continue`` (no step at this
+      call), ``AtSyncStatus::Started`` (it joined the step) or
+      ``AtSyncStatus::Blocked`` (MetaBalancer has not yet decided when
+      to balance; the element is stopped, must not iterate, and is
+      resumed through ``ResumeFromSync()`` -- or joined to the step for
+      it -- once that is decided).
+
+   -  ``AtSyncWait()`` stops the element until the step it joined is
+      over and then calls ``ResumeFromSync()``; if it joined no step, or
+      the step is already over, it calls ``ResumeFromSync()`` at once.
+      Either way the element is resumed exactly once per step.
+
+   Every ``AtSyncStart()`` must be followed by an ``AtSyncWait()``
+   before the next one; calling ``AtSyncStart()`` while the element's
+   previous step is still in flight aborts. (``AtSync()`` keeps its old
+   meaning: an element that calls it again before the step's resume
+   joins the next step as well.) ``AtSyncStepInFlight()`` tells an
+   element whether it still owes ``AtSyncWait()`` to a step, including
+   one it was joined to after ``AtSyncStart()`` returned ``Blocked``,
+   and ``AtSyncPending()`` whether its next ``AtSyncStart()`` will join
+   a step, so that work needed only before a migration (draining device
+   streams, say) can be skipped otherwise.
+
+   Without *+LBAsync* a joined element still waits for the step: the
+   step finishes only after every element has joined, as with
+   ``AtSync()``, and the work between the two calls runs before that.
+   With *+LBAsync* -- or ``CkLBSetAsync(true)``, called from a main
+   chare before the first step -- ``AtSyncStart()`` returns once the
+   element has joined, and the element keeps running while the strategy
+   decides and the migrations proceed: an element can be migrated at
+   any entry method boundary after it joins, so its pup routine must be
+   valid there, or it must narrow the window with
+   ``ReadyMigrate(false)`` (``AtSyncWait()`` opens it again).
+   ``AtSyncWait()`` then waits until every migration of the step, on
+   every PE, is over. Code written to the split calls is correct with
+   or without *+LBAsync*; the option decides only whether the work
+   between them overlaps the step. Under *+LBAsync* an element's load is
+   measured from the end of one step to its join of the next; the work
+   it does between its join and its resume is not billed to it, and the
+   load balancer scales its measured load to the time it was active.
+
+   A balancer whose step ends by quiescence detection, such as
+   DistributedLB, finishes its step under *+LBAsync* only once the
+   application has gone quiet, for example with its elements stopped in
+   ``AtSyncWait()``.
 
    .. note:: In AtSync mode, Applications that use dynamic insertion or
 	     deletion of array elements must not be doing so when any element
@@ -3768,6 +3828,30 @@ Below are the descriptions about the compiler and runtime options:
         force a global barrier on all processors to make sure that
         processors can only resume computation after migrations are
         completed on all processors.
+
+   -  | *+LBAsync*
+      | ``AtSyncStart()`` returns once the element has joined the step,
+        and the element keeps running while the step proceeds;
+        ``AtSyncWait()`` waits for the step's migrations on every PE
+        (see Section :numref:`lbarray`). Implies *+LBSyncResume* and
+        *+LBPeerDecision* (unless ``CHARM_LB_ASYNC_NO_PEER_DECISION=1``
+        is set in the environment). Under +LBSyncResume a distributed
+        balancer's step ends once every migration it ordered has been
+        acknowledged by the element's registration at its destination;
+        a move still outstanding after ten seconds is reported by name.
+
+   -  | *+LBPeerDecision*
+      | A centralized balancer sends each PE only the moves it is the
+        source of, down a tree, instead of broadcasting the whole
+        decision. Spans of at most *+LBScatterThreshold* ``<n>`` PEs
+        (default 32) get it by broadcast anyway.
+
+   -  | ``CHARM_LB_HELPER=near|<cpulist>|1`` (environment, Linux)
+      | Runs the round's CUPTI load build and, for a balancer that allows
+        it (MetisLB), the centralized strategy on a helper thread per
+        process, pinned to the given cores, so the PE keeps scheduling
+        meanwhile. ``CHARM_LB_CUPTI_OFFTHREAD`` and
+        ``CHARM_LB_STRATEGY_THREAD`` turn on one job each.
 
    -  | *+LBOff*
       | This option turns off load balancing instrumentation of both CPU

@@ -275,6 +275,21 @@ void hapiCuptiFinalize();
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
 
+struct LDObjHandle;  // lbdb.h
+// An object on this PE joined (or left) the current load balancing step. From
+// its join until its resume its kernels are left unattributed: under +LBAsync
+// it keeps running after it joins, and that work belongs to the next round,
+// not to the load being read (CkMigratable::lbSetMeasurementClosed). PE-local;
+// an arriving object states its own.
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle);
+void hapiCuptiObjectResumed(const LDObjHandle& handle);
+
+// Balancing steps overlap the application (+LBAsync): the round's records
+// are then flushed without CUPTI_ACTIVITY_FLAG_FLUSH_FORCED, which hands back
+// a buffer that still holds records CUPTI completes later -- from inside a
+// kernel launch on another PE, which is still running. Set by LBManager.
+void hapiCuptiSetAsyncLB(bool on);
+
 // Epoch a load balancer passes to hapiPrepareCuptiLoads: larger than any
 // epoch an application-level sampler will use, so an LB round always rebuilds
 // rather than reading a sampler's older loads.

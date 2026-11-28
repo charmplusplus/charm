@@ -200,29 +200,43 @@ struct MigrateDecision {
   LDObjIndex dbIndex;
   int fromPe;
   int toPe;
+  // Whether the balancer holds its migration barrier for this arrival. The
+  // destination counts the two kinds separately, so a decision message that
+  // leaves it out cannot tell the destination what to expect.
+  bool asyncArrival;
 
   MigrateDecision &operator=(const MigrateInfo &mInfo) {
     dbIndex = mInfo.obj.handle;
     fromPe = mInfo.from_pe;
     toPe = mInfo.to_pe;
+    asyncArrival = mInfo.async_arrival;
 
     return *this;
   }
 
 };
 
+// A centralized decision scattered down a tree of PEs (+LBPeerDecision): each
+// PE receives only the moves it is the source of, and its own arrival counts.
 class LBScatterMsg : public CMessage_LBScatterMsg {
 public:
   int numMigrates;
   int firstPeInSpan;
   int lastPeInSpan;
+  // The PE that runs the next centralized step, carried so the scatter needs
+  // nothing from the broadcast it replaces.
+  int next_lb;
+  // Arrivals the balancer holds its barrier for, and arrivals it does not,
+  // per PE in the span.
   int *numMigratesPerPe;
+  int *numFutureMigratesPerPe;
   MigrateDecision *moves;
 
   LBScatterMsg(int firstPe, int lastPe) {
     numMigrates = 0;
     firstPeInSpan = firstPe;
     lastPeInSpan = lastPe;
+    next_lb = 0;
   }
 };
 

@@ -582,7 +582,8 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
         }
         else {
           // migrate the object
-          lbmgr->Migrate(move.obj,move.to_pe);
+          if (lbmgr->Migrate(move.obj,move.to_pe) == 0)
+            CkAbort("[%d] HybridBaseLB: object to move is no longer registered\n", CkMyPe());
         }
       }
     }   // end if
@@ -1053,7 +1054,8 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
       }
       CmiAssert(outObjs[i].toPe != -1);
         // migrate now!
-      lbmgr->Migrate(outObjs[i].handle,outObjs[i].toPe);
+      if (lbmgr->Migrate(outObjs[i].handle,outObjs[i].toPe) == 0)
+        CkAbort("[%d] HybridBaseLB: object to move is no longer registered\n", CkMyPe());
     }   // end for out
     // incoming
     lData->migrates_expected = 0;

@@ -1587,12 +1587,36 @@ void CkMigratable::commonInit(void)
   local_state = OFF;
   prev_load = 0.0;
   can_reset = false;
+  lbStepPending = false;
+  waitParked = false;
+  lbWaitEpoch = 0;
+  lbMeasurementClosed = false;
+  lbStepSeen = 0;
+  lbIterNo = 0;
+  lbStepBlocked = false;
+  metaLBStreamJoinedPe = -1;
 
 #if CMK_LBDB_ON
+  // Join whatever step this PE has already been asked for rather than trying
+  // to start it: an element created (or arriving) mid-step would otherwise
+  // reach the barrier for an epoch whose local barrier has already fired.
+  lbStepSeen = CkpvAccess(_lbStepRequested);
   if (_lb_args.metaLbOn())
   {
-    atsync_iteration = myRec->getMetaBalancer()->get_iteration();
-    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    if (_lb_args.metaLbGpuTrigger())
+    {
+      // Under the GPU trigger the element joins its PE's sample stream at its
+      // first sample, not here (sampleMetaLBLoad): joining records the sample
+      // index it will first contribute to, which is true only of the instant
+      // it is done, and an element that arrives while its new PE keeps
+      // sampling would otherwise record an index already in the past.
+      atsync_iteration = -1;
+    }
+    else
+    {
+      atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+      myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    }
   }
 #endif
 }
@@ -1635,10 +1659,38 @@ void CkMigratable::pup(PUP::er& p)
       epoch = (*ldBarrierHandle)->epoch;
     }
     p | epoch;
+    // +LBAsync wait state. An element can be stopped in AtSyncWait() at the
+    // moment the step it is waiting on moves it, and the destination has to be
+    // able to finish that wait -- see lbCheckWaitRelease. Not checkpointed, for
+    // the same reason the barrier epoch is not: it describes a step in flight.
+    p | lbStepPending;
+    p | waitParked;
+    p | lbWaitEpoch;
+    p | lbMeasurementClosed;
+    p | lbStepSeen;
+    p | lbIterNo;
+    p | lbStepBlocked;
+    if (p.isUnpacking()) lbSetMeasurementClosed(lbMeasurementClosed);
   }
 
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
+}
+
+void CkMigratable::lbSetMeasurementClosed(bool closed)
+{
+  lbMeasurementClosed = closed;
+#if CMK_LBDB_ON
+  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), closed);
+#if CMK_CUDA
+  // PE-local: an arrival must overwrite both a missing exclusion on its new PE
+  // and a stale one on a PE it is returning to.
+  if (closed)
+    hapiCuptiObjectJoinedStep(myRec->getLdHandle());
+  else
+    hapiCuptiObjectResumed(myRec->getLdHandle());
+#endif
+#endif
 }
 
 void CkMigratable::ckDestroy(void) {}
@@ -1668,7 +1720,9 @@ CkMigratable::~CkMigratable()
       myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
   }
 
-  if (_lb_args.metaLbOn())
+  // Under the GPU trigger atsync_iteration == -1 means this element never
+  // joined its PE's sample stream, so no sample is waiting on it.
+  if (_lb_args.metaLbOn() && (!_lb_args.metaLbGpuTrigger() || atsync_iteration != -1))
   {
     myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
   }
@@ -1728,7 +1782,10 @@ void CkMigratable::clearMetaLBData()
 {
   //  if (can_reset) {
   local_state = OFF;
-  atsync_iteration = -1;
+  // The GPU trigger's sample stream runs free across balancing steps: every
+  // PE completes every sample index in order. Resetting the counter here would
+  // make this element contribute again to indices its PE has already closed.
+  if (!_lb_args.metaLbGpuTrigger()) atsync_iteration = -1;
   prev_load = 0.0;
   can_reset = false;
   //  }
@@ -1736,6 +1793,39 @@ void CkMigratable::clearMetaLBData()
 
 void CkMigratable::recvLBPeriod(void* data)
 {
+  if (_lb_args.metaLbGpuTrigger())
+  {
+    // The GPU trigger schedules on lbIterNo, not on a predicted period, so
+    // none of the state machine below applies. This is the agreed count
+    // arriving: an element stopped at the tentative floor either joins now,
+    // or is let go to keep iterating up to the count.
+    if (!lbStepBlocked) return;
+    lbStepBlocked = false;
+    const int agreed = *((int*)data);
+    if (lbIterNo >= agreed)
+    {
+      if (_lb_args.lbAsync())
+      {
+        // Joining never stops an element under +LBAsync, and its AtSyncStart
+        // already returned, so it is handed back to the application here; it
+        // owes AtSyncWait to the step (AtSyncStepInFlight).
+        lbJoinStep(1);
+        ResumeFromSync();
+      }
+      else
+      {
+        // Stopped, as in AtSyncWait, so the step's resume hands it back --
+        // set before the join, which can finish the step inside the call.
+        waitParked = true;
+        lbJoinStep(1);
+      }
+    }
+    else
+    {
+      ResumeFromSync();
+    }
+    return;
+  }
   if (atsync_iteration < 0)
   {
     return;
@@ -1791,24 +1881,29 @@ void CkMigratable::ckFinishConstruction(int epoch)
   barrierRegistered = true;
 }
 
+// The unsplit call: the two halves, back to back, so there is one way to join
+// a balancing step. Code that wants to overlap its own work with the step calls
+// the halves itself and puts that work between them; written that way it is
+// correct with or without +LBAsync, and the flag only decides whether the work
+// in between actually overlaps the step.
 void CkMigratable::AtSync(int waitForMigration)
 {
-  if (!usesAtSync)
-    CkAbort(
-        "You must set usesAtSync=true in your array element constructor to use "
-        "AtSync!\n");
-  // Only actually call AtSync when a receiver exists, otherwise skip it and
-  // directly call ResumeFromSync
-  if (!myRec->getSyncBarrier()->hasReceivers())
-  {
-    ResumeFromSync();
-    return;
-  }
-  myRec->AsyncMigrate(!waitForMigration);
-  if (waitForMigration)
-    ReadyMigrate(true);
-  ckFinishConstruction();
-  DEBL((AA "Element %s going to sync\n" AB, idx2str(thisIndexMax)));
+  // Blocked means the element is stopped and must not run -- so it must not
+  // wait either. It is handed back through ResumeFromSync, which is exactly
+  // what an unsplit caller is already waiting for.
+  if (lbStart(waitForMigration, false) == AtSyncStatus::Blocked) return;
+  AtSyncWait();
+}
+
+CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
+{
+  return lbStart(waitForMigration, true);
+}
+
+// What the load balancer needs to know about this element besides its load:
+// the user-provided load of a model-based element and its serialized size.
+void CkMigratable::recordLBSizes()
+{
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == false)
     UserSetLBLoad();
@@ -1828,20 +1923,40 @@ void CkMigratable::AtSync(int waitForMigration)
     if (_lb_args.metaLbOn())
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
   }
+}
 
-  if (!_lb_args.metaLbOn())
-  {
-    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
-    return;
-  }
-
-  // When MetaBalancer is turned on
-
+// Fold this element's load since its last sample into the local MetaBalancer.
+// Once every element on this PE has done so for a sample index, the PE
+// contributes it. Nothing here is collective and nothing blocks.
+void CkMigratable::sampleMetaLBLoad()
+{
   if (atsync_iteration == -1)
   {
     can_reset = false;
     local_state = OFF;
     prev_load = 0.0;
+    if (_lb_args.metaLbGpuTrigger())
+    {
+      // Join the stream where this PE is now. AdjustCountForNewContributor
+      // credits the samples still open here, which are exactly the ones this
+      // element skips -- so they can complete without it -- and the one it
+      // is about to open is the first it owes.
+      atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+      myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+      metaLBStreamJoinedPe = CkMyPe();
+    }
+  }
+  else if (_lb_args.metaLbGpuTrigger() && metaLBStreamJoinedPe != CkMyPe())
+  {
+    // Arrived from another PE, carrying that PE's sample index. Streams
+    // advance per PE, so the index can already be behind this one; join where
+    // this PE is, and credit its open samples for a contributor they were not
+    // counting, exactly as for a new element. The source's stream let go of
+    // the element when it was destroyed there (~CkMigratable).
+    const int here = myRec->getMetaBalancer()->get_iteration();
+    if (atsync_iteration < here) atsync_iteration = here;
+    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    metaLBStreamJoinedPe = CkMyPe();
   }
 
   atsync_iteration++;
@@ -1859,6 +1974,10 @@ void CkMigratable::AtSync(int waitForMigration)
     current_load = myRec->getObjTime();
   }
 
+  // A step's ClearLoads can fall inside a sample window, restarting the object
+  // timer below the reading this element last took.
+  if (current_load < 0.0) current_load = 0.0;
+
   if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration())
   {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n", CkMyPe(),
@@ -1871,29 +1990,223 @@ void CkMigratable::AtSync(int waitForMigration)
   {
     myRec->getMetaBalancer()->AddLoad(atsync_iteration, current_load);
   }
+}
 
+// Contribute this element's load to MetaBalancer without joining anything.
+// Called every few iterations: on CUDA it is the expensive half (the PE's
+// sample builds the process's GPU loads once per sample index).
+void CkMigratable::AtSyncSample()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncSample!\n");
+  // No balancer is listening, or MetaBalancer is off and nothing consumes the
+  // sample: a no-op, so applications can call it unconditionally.
+  if (!_lb_args.metaLbOn() || !myRec->getSyncBarrier()->hasReceivers()) return;
+
+  ckFinishConstruction();
+  recordLBSizes();
+  sampleMetaLBLoad();
+}
+
+bool CkMigratable::AtSyncPending() const
+{
+  if (!usesAtSync || !myRec->getSyncBarrier()->hasReceivers()) return false;
+  // Without MetaBalancer every AtSyncStart joins a step, so one is always due.
+  if (!_lb_args.metaLbOn()) return true;
+  if (_lb_args.metaLbGpuTrigger())
+  {
+    // A step is agreed, and this element's next AtSyncStart is the one it was
+    // agreed for: a step can be requested many iterations before its count.
+    if (CkpvAccess(_lbStepRequested) <= lbStepSeen) return false;
+    const int agreed = CkpvAccess(_lbStepPeriod);
+    return agreed > 0 && lbIterNo + 1 >= agreed;
+  }
   bool is_tentative;
-  if (atsync_iteration < myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative))
+  return atsync_iteration + 1 >=
+         myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative);
+}
+
+// Join a load balancing step if one is due: AtSyncStart (split) and the first
+// half of AtSync. See the header for the contract.
+//
+// Nothing resumes the element from this half, in either mode: AtSyncWait() is
+// the single point a joined step is handed back, and it resumes inline when
+// there was no step to wait for. That is what lets one code path serve both.
+CkMigratable::AtSyncStatus CkMigratable::lbStart(int waitForMigration, bool split)
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSync!\n");
+  // No balancer is listening; AtSyncWait() resumes the element inline.
+  if (!myRec->getSyncBarrier()->hasReceivers()) return AtSyncStatus::Continue;
+
+  // One step at a time, per element, under the split barrier. Joining again
+  // would pass the barrier twice for one element and could fire the next
+  // step's barrier before this step's migrations had even been released.
+  //
+  // The unsplit AtSync keeps its old meaning: an element still receives
+  // messages while it waits, and one that calls AtSync again before the step's
+  // resume joins the next step, the barrier counting each call. The step that
+  // is in flight resumes it through its stop in AtSyncWait, and the next one
+  // through ResumeFromSyncHelper's resume of an element that did not stop --
+  // once per step, as before.
+  if (lbStepPending && split)
+    CkAbort(
+        "AtSyncStart() called while the load balancing step this element started "
+        "is still in flight. Every AtSyncStart() must be followed by an "
+        "AtSyncWait() before the next one.\n");
+
+  if (_lb_args.metaLbOn() && _lb_args.metaLbGpuTrigger())
   {
+    // The application calls this on a fixed cadence, so this counter is the
+    // clock every element agrees on. It advances on every call, including the
+    // calls with no step to join, or the counts drift apart.
+    ++lbIterNo;
+    myRec->getMetaBalancer()->reportStartNo(lbIterNo);
+
+    if (CkpvAccess(_lbStepRequested) <= lbStepSeen) return AtSyncStatus::Continue;
+
+    const int agreed = CkpvAccess(_lbStepPeriod);
+    if (agreed == 0)
+    {
+      // A step has been called for but its count is still being agreed. Run
+      // up to the tentative floor and stop there. Stopping is the mechanism:
+      // it bounds how far any element can get before the count is settled, so
+      // the agreed count is one no element has passed.
+      if (lbIterNo < CkpvAccess(_lbStepTentative)) return AtSyncStatus::Continue;
+      lbStepBlocked = true;
+      return AtSyncStatus::Blocked;
+    }
+    if (lbIterNo < agreed) return AtSyncStatus::Continue;
+    lbJoinStep(waitForMigration);
+    return AtSyncStatus::Started;
+  }
+
+  if (_lb_args.metaLbOn())
+  {
+    // MetaBalancer picks a step from a predicted period, and the element joins
+    // the barrier separately, through metaLBCallLB(), once the decision
+    // reaches it. So this half only records where the element is, never joins,
+    // and the element is stopped until that decision arrives.
+    myRec->AsyncMigrate(!waitForMigration);
+    if (waitForMigration) ReadyMigrate(true);
+    ckFinishConstruction();
+    recordLBSizes();
+    sampleMetaLBLoad();
+
+    bool is_tentative;
+    if (atsync_iteration <
+        myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative))
+      return AtSyncStatus::Continue;
+
+    if (!is_tentative && local_state == DECIDED)
+    {
+      DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax),
+             atsync_iteration));
+      local_state = LOAD_BALANCE;
+      can_reset = true;
+    }
+    else
+    {
+      DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax),
+             atsync_iteration));
+      local_state = PAUSE;
+    }
+    return AtSyncStatus::Blocked;
+  }
+
+  // With MetaBalancer off there is nothing to decide for us, so every call
+  // joins a step and the application's own cadence is the trigger.
+  lbJoinStep(waitForMigration);
+  return AtSyncStatus::Started;
+}
+
+// The tail of a step join.
+void CkMigratable::lbJoinStep(int waitForMigration)
+{
+  if (_lb_args.metaLbOn()) lbStepSeen = CkpvAccess(_lbStepRequested);
+  myRec->AsyncMigrate(!waitForMigration);
+  // Migratable straight away, in both modes. An element that keeps running
+  // under +LBAsync can still be moved at any entry-method boundary, because
+  // making its own state safe to pack is its pup's job: only the application
+  // knows which of its streams to settle. Holding the move until AtSyncWait
+  // instead would mean an element never overlaps its own migration with its
+  // own iterations, which is most of the point of the split. An application
+  // whose pup is valid only at certain points narrows the window with
+  // ReadyMigrate(false); AtSyncWait() opens it again.
+  if (waitForMigration)
+    ReadyMigrate(true);
+  ckFinishConstruction();
+  DEBL((AA "Element %s joining LB step\n" AB, idx2str(thisIndexMax)));
+  recordLBSizes();
+
+  // Under +LBAsync this element's measurement window closes here, at its own
+  // join -- not at the barrier, and not PE-wide. It keeps running until the
+  // step is handed back to it, and that work belongs to the next round:
+  // billing it here would inflate the measured load of whichever elements
+  // joined earliest, so the strategy would see a different imbalance than a
+  // synchronous run of the same work. Reopened when the step is handed back.
+  // Under the barrier a joined element waits, and its measurement is left as
+  // it always was.
+  if (_lb_args.lbAsync()) lbSetMeasurementClosed(true);
+
+  local_state = LOAD_BALANCE;
+  can_reset = true;
+  lbStepPending = true;
+  lbWaitEpoch = myRec->getLBMgr()->resumeEpoch();
+  // Last: if this completes the PE's barrier and no balancer has anything to
+  // do, the step can finish inside this call (ResumeFromSyncHelper).
+  myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
+}
+
+// The blocking half of the split. See the header for the contract.
+void CkMigratable::AtSyncWait()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncWait!\n");
+  if (!lbStepPending)
+  {
+    // No step joined, or the step is already over: hand the element back now,
+    // and the element's measurement window opens again here.
+    lbSetMeasurementClosed(false);
     ResumeFromSync();
+    return;
   }
-  else if (is_tentative)
-  {
-    local_state = PAUSE;
-  }
-  else if (local_state == DECIDED)
-  {
-    DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax),
-           atsync_iteration));
-    local_state = LOAD_BALANCE;
-    can_reset = true;
-  }
-  else
-  {
-    DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax),
-           atsync_iteration));
-    local_state = PAUSE;
-  }
+  waitParked = true;
+  // For a step joined with waitForMigration, the stop is by definition a point
+  // the application has declared safe, so readiness is asserted again here. An
+  // application that narrows its safe window with ReadyMigrate(false) -- which
+  // it must if its pup is valid only at certain points -- would otherwise leave
+  // a move buffered in nextPe with nothing left to run it: invokeEntry calls
+  // checkBufferedMigration when this element's entry method returns, which is
+  // where such a move departs. A step joined with AtSyncStart(0) leaves
+  // readiness to the application, as AtSync(0) always has (TCharm moves its
+  // thread only where it calls allow_migrate).
+  if (!myRec->isAsyncMigrate()) ReadyMigrate(true);
+}
+
+// An element that stopped in AtSyncWait() and was then moved by the very step
+// it was waiting on can arrive at its destination after that PE resumed its
+// clients, so nothing there would ever call it back. Under +LBSyncResume, which
+// +LBAsync forces on, the resume epoch advances globally in step, so comparing
+// the destination's against the one the element stopped at settles it.
+void CkMigratable::lbCheckWaitRelease()
+{
+  if (!_lb_args.lbAsync() || !lbStepPending) return;
+  if (myRec->getLBMgr()->resumeEpoch() <= lbWaitEpoch) return;
+
+  lbStepPending = false;
+  if (!waitParked) return;  // AtSyncWait() will find the step over
+  waitParked = false;
+  DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
+        idx2str(thisIndexMax)));
+  lbSetMeasurementClosed(false);
+  ResumeFromSync();
 }
 
 void CkMigratable::ReadyMigrate(bool ready) { myRec->ReadyMigrate(ready); }
@@ -1906,6 +2219,29 @@ void CkMigratable::ResumeFromSyncHelper()
   {
     clearMetaLBData();
   }
+
+  // The step this element joined is over, in either mode -- AtSyncStart()
+  // refuses to begin another while this is set.
+  const bool joined = lbStepPending;
+  lbStepPending = false;
+  if (waitParked)
+  {
+    waitParked = false;
+  }
+  else if (joined)
+  {
+    // Joined, but not stopped in AtSyncWait() yet: under +LBAsync the element
+    // kept running, and under either mode the step can finish inside the
+    // AtSyncStart() call that completed this PE's barrier. AtSyncWait() finds
+    // the step over and hands the element back itself, so resuming it here
+    // too would resume it twice.
+    return;
+  }
+  // Otherwise the element was stopped without AtSyncWait(): MetaBalancer's
+  // path, where AtSyncStart() returned Blocked and metaLBCallLB() joined.
+
+  // Handed back: this element's measurement window opens again.
+  lbSetMeasurementClosed(false);
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
@@ -1990,6 +2326,11 @@ CkLocRec::~CkLocRec()
   if (deletedMarker != NULL)
     *deletedMarker = true;
 #if CMK_LBDB_ON
+  // A move recorded in a step's ledger that will now never be made: the
+  // element is destroyed without having left (emigrate consumes the tag).
+  // Retired here, or the step never resumes.
+  if (lbLedgerStep >= 0)
+    lbmgr->ledgerRetireLocal(myLocMgr->ckGetGroupID().idx, getID(), "element destroyed");
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
   lbmgr->UnregisterObj(ldHandle);
@@ -2184,17 +2525,67 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
   el->recvMigrate(dest);
 }
 
+extern int _lbDeferredMoveHandlerIdx;
+
+// Under +LBAsync a balancer's moves are not executed inline.
+//
+// A strategy's decision loop hands every move of the step to recvMigrate in one
+// go, and each one used to pack, send and destroy its element right there: all
+// of a PE's moves back to back on the scheduler thread, with the application's
+// messages waiting behind them. With the application stopped at the barrier
+// that costs nothing extra; under the split barrier it is the one part of the
+// step that does not overlap the application. So each move is posted to this
+// PE's own scheduler queue instead and runs after the work already queued.
+// The handler takes the element by identity, not by record pointer: the record
+// can die between the post and the handler.
+struct LBDeferredMoveMsg
+{
+  char header[CmiMsgHeaderSizeBytes];
+  CkGroupID mgrGid;
+  CmiUInt8 id;
+  int toPe;
+};
+
 void CkLocRec::recvMigrate(int toPe)
 {
   lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
+  // The one point every move a balancer orders passes through, before any
+  // deferral (the readyMigrate buffer, the +LBAsync post, device-channel
+  // work). If a step is recording its moves, enter this one in its ledger and
+  // tag the record so emigrate can tell the destination whom to ack.
+  const int step = lbmgr->ledgerRecord(myLocMgr->ckGetGroupID().idx, getID(), toPe);
+  if (step >= 0) lbLedgerStep = step;
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
   {
+    if (_lb_args.lbAsync())
+    {
+      LBDeferredMoveMsg* m = (LBDeferredMoveMsg*)CmiAlloc(sizeof(LBDeferredMoveMsg));
+      m->mgrGid = myLocMgr->ckGetGroupID();
+      m->id = getID();
+      m->toPe = toPe;
+      CmiSetHandler(m, _lbDeferredMoveHandlerIdx);
+      CmiPushPE(CmiMyRank(), m);
+      return;
+    }
     migrateMe(toPe);
   }
   else
     nextPe = toPe;
+}
+
+// The posted move, from the scheduler. The application's window still
+// governs: an element that closed it since the post (ReadyMigrate(false))
+// keeps the move buffered for its next safe point, as recvMigrate does.
+void CkLocRec::takeDeferredMove(int toPe)
+{
+  if (!readyMigrate)
+  {
+    nextPe = toPe;
+    return;
+  }
+  migrateMe(toPe);
 }
 
 void CkLocRec::AsyncMigrate(bool use)
@@ -2247,6 +2638,20 @@ void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
 }
 
 #endif
+
+// Registered in init.C whatever the build; only +LBAsync posts to it.
+int _lbDeferredMoveHandlerIdx;
+extern "C" void _lbDeferredMoveHandler(void* arg)
+{
+#if CMK_LBDB_ON
+  LBDeferredMoveMsg* m = (LBDeferredMoveMsg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(m->mgrGid);
+  CkLocRec* rec = mgr ? mgr->localRecord(m->id) : NULL;
+  // An element that moved or died since the post makes it moot.
+  if (rec != NULL) rec->takeDeferredMove(m->toPe);
+#endif
+  CmiFree(arg);
+}
 
 // Call ckDestroy for each record, which deletes the record, and ~CkLocRec()
 // removes it from the hash table, which would invalidate an iterator.
@@ -3094,6 +3499,7 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   // Call ckJustMigrated
   CkLocRec* myLocRec = elementNrec(id);
   callMethod(myLocRec, &CkMigratable::ckJustMigrated);
+  callMethod(myLocRec, &CkMigratable::lbCheckWaitRelease);
 
   // Call ResumeFromSync on elements that were waiting for rgets
   auto iter2 = toBeResumeFromSynced.find(id);
@@ -3825,12 +4231,21 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_LBDB_ON
                                                     // The balancer counts the arrivals it ordered;
                                                     // a migrateMe is not one of them.
-                                                    rec->isAsyncMigrate() || !rec->isLBOrderedMigrate(),
+                                                    !rec->isLBOrderedMigrate(),
 #else
                                                     false,
 #endif
                                                     bufSize,
                                                     newEpoch, life, gpuBufSize > 0);
+#if CMK_LBDB_ON
+  msg->asyncArrival = rec->isAsyncMigrate();
+  // A move recorded in a step's move ledger: the destination acks this PE once
+  // the element has registered there. The tag is consumed here, so the record's
+  // destructor, which runs below, does not retire the move a second time.
+  msg->lbLedgerSrcPe = (rec->lbLedgerStep >= 0) ? CkMyPe() : -1;
+  msg->lbLedgerStep = rec->lbLedgerStep;
+  rec->lbLedgerStep = -1;
+#endif
 
   {
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
@@ -3963,9 +4378,16 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   CkMigrationFinished();
   insertID(idx, msg->id);
 
-  // Create a record for this element
-  CkLocRec* rec = createLocal(idx, true, msg->ignoreArrival,
+  // Create a record for this element. The record tells the balancer of an
+  // arrival it holds its barrier for; an asynchronous one is counted here.
+  CkLocRec* rec = createLocal(idx, true, msg->ignoreArrival || msg->asyncArrival,
                               false /* home told on departure */, msg->epoch, msg->life);
+#if CMK_LBDB_ON
+  // CentralLB tallies these in future_migrates_completed and holds the end of
+  // the step -- and with it the next step -- until every one of them is in.
+  if (!msg->ignoreArrival && msg->asyncArrival)
+    getLBMgr()->Migrated(rec->getLdHandle(), false);
+#endif
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
@@ -3990,6 +4412,14 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
 
+#if CMK_LBDB_ON
+  // The element is registered here: retire its entry in the source's move
+  // ledger. This ack is what releases the source's share of the step's resume.
+  if (msg->lbLedgerSrcPe >= 0)
+    CProxy_LBManager(_lbmgr)[msg->lbLedgerSrcPe].ledgerRetire(thisgroup.idx, msg->id,
+                                                              msg->lbLedgerStep);
+#endif
+
 #if CMK_CUDA
   if (msg->hasGPUMsg)
   {
@@ -4004,6 +4434,7 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   {
     // Let all the elements know we've arrived
     callMethod(rec, &CkMigratable::ckJustMigrated);
+    callMethod(rec, &CkMigratable::lbCheckWaitRelease);
   }
 
   delete msg;

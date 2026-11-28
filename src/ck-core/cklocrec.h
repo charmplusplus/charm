@@ -95,6 +95,16 @@ public:
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
   bool isLBOrderedMigrate() { return lbOrderedMigrate; }
+  // A move recvMigrate posted to this PE's queue under +LBAsync, from the
+  // scheduler: taken now if the element may migrate, else left for its next
+  // safe point.
+  void takeDeferredMove(int toPe);
+  // Step of the balancer's move ledger this element's pending move is recorded
+  // in, or -1. Set in recvMigrate while a step is recording its moves; consumed
+  // by emigrate, which stamps the migration message so the destination knows
+  // whom to ack once the element registers there. Survives any deferral in
+  // between; never pupped (the message carries it instead).
+  int lbLedgerStep = -1;
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user
   bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration

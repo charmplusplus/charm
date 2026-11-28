@@ -7,6 +7,9 @@
 #define LBMANAGER_H
 
 #include <cassert>
+#include <functional>
+#include <map>
+#include <utility>
 
 #include "LBDatabase.h"
 #include "conv-ccs.h"   // CcsDelayedReply
@@ -14,7 +17,9 @@
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
-#define LB_FORMAT_VERSION 3
+// 6 adds LDObjData::windowTime. (4 and 5 belong to fields this tree does not
+// carry; a dump of one of those versions is not readable here.)
+#define LB_FORMAT_VERSION 6
 
 #define LB_MANAGER_VERSION 1
 
@@ -43,7 +48,13 @@ class CkLBArgs
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
+  bool _lb_async;          // AtSyncStart returns without waiting for the step
+  bool _lb_asyncFromFlag;  // +LBAsync was on the command line, so CkLBSetAsync changes nothing
+  bool _lb_peerDecision;   // scatter a centralized decision instead of broadcasting it
+  int _lb_scatterThreshold;  // spans of at most this many PEs get a broadcast, not a scatter
   bool _lb_metaLbOn;
+  bool _lb_metaLbGpuTrigger;  // MetaLB: trigger on per-device GPU imbalance
+  double _lb_metaLbGpuTol;    // MetaLB: max/avg device load that triggers
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
   int _lb_percentMovesAllowed;  // for the greedy-refine balancers, as a
@@ -76,7 +87,13 @@ class CkLBArgs
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
+    _lb_async = false;
+    _lb_asyncFromFlag = false;
+    _lb_peerDecision = false;
+    _lb_scatterThreshold = 32;
     _lb_metaLbOn = false;
+    _lb_metaLbGpuTrigger = false;
+    _lb_metaLbGpuTol = 1.1;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
     _lb_greedyRefineTolerance = 1.1;  // 10% over greedy; <=0 searches instead
@@ -100,7 +117,13 @@ class CkLBArgs
   inline double& beta() { return _lb_beta; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
+  inline bool& lbAsync() { return _lb_async; }
+  inline bool& asyncFromFlag() { return _lb_asyncFromFlag; }
+  inline bool& lbPeerDecision() { return _lb_peerDecision; }
+  inline int& scatterThreshold() { return _lb_scatterThreshold; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
+  inline bool& metaLbGpuTrigger() { return _lb_metaLbGpuTrigger; }
+  inline double& metaLbGpuTolerance() { return _lb_metaLbGpuTol; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
   inline double& greedyRefineTolerance() { return _lb_greedyRefineTolerance; }
@@ -146,7 +169,32 @@ class CkLBOptions
 
     extern CkGroupID _lbmgr;
 
+// Turns asynchronous balancing (+LBAsync) on or off from the application, for
+// an application written to the split barrier (AtSyncStart / AtSyncWait), so
+// it need not be passed on the command line. Call it from a main chare before
+// the first balancing step; it reaches every PE. With +LBAsync on the command
+// line it changes nothing.
+void CkLBSetAsync(bool on);
+
 CkpvExtern(bool, lbmanagerInited);
+
+// Sequence number of the most recent balancing step MetaBalancer's GPU trigger
+// has requested on this PE, or 0. Monotonic: an element joins a step when this
+// rises above the sequence it last joined, so the check in AtSyncStart is one
+// read of a PE-private int and can run on every application iteration.
+CkpvExtern(int, _lbStepRequested);
+
+// The value of CkMigratable::lbIterNo at which the requested step is joined,
+// agreed across all PEs before it is broadcast (0 while still being agreed),
+// so every element enters the step at the same application iteration.
+CkpvExtern(int, _lbStepPeriod);
+
+// The floor broadcast when the vote opens, before the count is agreed. No
+// element runs past it, which is what makes the agreed count authoritative
+// rather than a race its broadcast has to win: the furthest any element can be
+// when the count is settled is one call past what it reported, and the agreed
+// count is one past the furthest report.
+CkpvExtern(int, _lbStepTentative);
 
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
@@ -266,8 +314,18 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
+  int resume_epoch = 0;
+
  public:
   int chare_count;
+
+  // Number of load balancing steps whose clients this PE has resumed. Under
+  // +LBSyncResume -- which +LBAsync forces on -- the resume is driven by a
+  // global reduction, so this advances in lockstep everywhere and is
+  // comparable across PEs. An element stopped in AtSyncWait() records the value
+  // it is waiting past, which is how one that gets migrated by the very step it
+  // is waiting on can tell, on arrival, that its destination already resumed.
+  int resumeEpoch() const { return resume_epoch; }
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -276,6 +334,20 @@ class LBManager : public CBase_LBManager
  private:
   void init();
   void InvokeLB();
+
+  // Move-ledger state (see the ledger* methods below). Transient within one
+  // balancer step; not pupped. Keyed by (location manager group, element id):
+  // element ids are unique only within one location manager.
+  std::map<std::pair<int, CmiUInt8>, int> ledgerEntries;  // -> destination PE
+  bool ledgerRecording = false;  // inside the decision loop
+  bool ledgerActive = false;     // open, or closed and draining
+  bool ledgerClosed = false;     // every move issued; fire when empty
+  int ledgerStep = -1;
+  double ledgerOpenTime = 0.0;
+  double ledgerLastWarn = 0.0;
+  std::function<void()> ledgerDoneFn;
+  void maybeFireLedger();
+  static void ledgerWatch(void* arg);
 
  public:
   LBDatabase* getLBDB() { return lbdb_obj; }
@@ -304,6 +376,31 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->RegisterOM(userID, userptr, cb);
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
+
+  // ---- Move ledger -------------------------------------------------------
+  // One entry per move this PE must make in the current balancer step, keyed
+  // by the element's identity, which source and destination both know. Opened
+  // around a strategy's decision loop (DistBaseLB::ProcessMigrationDecision);
+  // recorded from CkLocRec::recvMigrate, the one point every move a balancer
+  // orders passes through however it is deferred later; retired by the
+  // destination once the element has registered there. The PE's share of the
+  // step's resume is held until the ledger drains, so the step waits on every
+  // move by identity -- deferred ones included -- instead of on arrival
+  // counts, and a duplicate or unknown ack is caught where it happens.
+  void ledgerOpen(int step);
+  // The step to tag the element's record with, or -1 when no ledger is
+  // recording (a balancer that does not use one, or a move the application
+  // made itself).
+  int ledgerRecord(int locMgr, CmiUInt8 id, int toPe);
+  // Every move is issued; run `done` once each one has been retired (at once
+  // when the ledger is already empty, or was never opened).
+  void ledgerClose(std::function<void()> done);
+  // Entry method: the destination's ack that the element registered there.
+  void ledgerRetire(int locMgr, CmiUInt8 id, int step);
+  // A recorded move that will never be made (the element was destroyed before
+  // it left). Without this the step would wait for it forever.
+  void ledgerRetireLocal(int locMgr, CmiUInt8 id, const char* why);
+
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
   void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
@@ -352,6 +449,7 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
+  LBRealType GetTotalObjGPULoad(void) { return lbdb_obj->GetTotalObjGPULoad(); }
   // Copy a round's normalized per-object GPU loads (built by
   // hapiPrepareCuptiLoads) into this PE's LB objects, just before its stats
   // are sent.
@@ -391,6 +489,11 @@ class LBManager : public CBase_LBManager
   void EstObjGPULoad(const LDObjHandle& h, double gpuload)
   {
     lbdb_obj->EstObjGPULoad(h, gpuload);
+  }
+  // The object joined (true) or left (false) the current balancing step.
+  void SetObjJoinedStep(const LDObjHandle& h, bool joined)
+  {
+    lbdb_obj->SetObjJoinedStep(h, joined);
   }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {
@@ -528,6 +631,7 @@ class LBManager : public CBase_LBManager
 
   void LocalBarrierOn(void);
   void LocalBarrierOff(void);
+  void setAsyncMode(bool on);  // entry: see CkLBSetAsync
   void ResumeClients();
   static int ProcessorSpeed();
   static void SetLBPeriod(double period)

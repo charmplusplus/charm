@@ -181,6 +181,8 @@ extern void _ckDestroyLaterHandler(void *m);   // ck.C
 CkpvExtern(std::unordered_set<Chare *>, _ckDestroyLaterPending);   // ck.C
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
+extern int _lbDeferredMoveHandlerIdx;             // cklocation.C
+extern "C" void _lbDeferredMoveHandler(void *m);  // cklocation.C
 
 bool  _mainDone = false;
 CksvDeclare(bool, _triggersSent);
@@ -1593,6 +1595,8 @@ void _initCharm(int unused_argc, char **argv)
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
 	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
+	// A balancer's move posted to the source PE's queue under +LBAsync.
+	CmiAssignOnce(&_lbDeferredMoveHandlerIdx, CmiRegisterHandler((CmiHandler)_lbDeferredMoveHandler));
 	_ckModuleInit();
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);

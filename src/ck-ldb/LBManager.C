@@ -20,12 +20,23 @@ void LBObjLoadsCcsHandler(char* msg);
 #include "json.hpp"
 #include <atomic>
 
+#if CMK_CUDA && CMK_LBDB_ON
+#include "hapi.h"
+#endif
+
 CkGroupID _lbmgr;
+// CkLBSetAsync called before the LBManager group exists (see LBMgrInit):
+// remembered here and broadcast once it does.
+static bool lbmgrCreated = false;
+static int pendingAsyncRequest = -1;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
+CkpvDeclare(int, _lbStepRequested);
+CkpvDeclare(int, _lbStepPeriod);
+CkpvDeclare(int, _lbStepTentative);
 
 extern int quietModeRequested;
 
@@ -152,6 +163,11 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 {
 #if CMK_LBDB_ON
   _lbmgr = CProxy_LBManager::ckNew();
+  lbmgrCreated = true;
+  // An application main chare that ran before this one asked for asynchronous
+  // balancing: tell every PE now that the group exists.
+  if (pendingAsyncRequest >= 0)
+    CProxy_LBManager(_lbmgr).setAsyncMode(pendingAsyncRequest != 0);
 
   // runtime specified load balancer
   if (!lbRegistry.runtime_lbs.empty())
@@ -189,6 +205,13 @@ void _loadbalancerInit()
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
 
+  CkpvInitialize(int, _lbStepRequested);
+  CkpvAccess(_lbStepRequested) = 0;
+  CkpvInitialize(int, _lbStepPeriod);
+  CkpvAccess(_lbStepPeriod) = 0;
+  CkpvInitialize(int, _lbStepTentative);
+  CkpvAccess(_lbStepTentative) = 0;
+
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
   CkpvAccess(_lb_obj_index) = -1;
@@ -203,6 +226,11 @@ void _loadbalancerInit()
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
   CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
                       "Use this directory to read model for MetaLB");
+  _lb_args.metaLbGpuTrigger() = CmiGetArgFlagDesc(
+      argv, "+MetaLBGpuTrigger", "MetaBalancer triggers on per-device GPU load imbalance");
+  CmiGetArgDoubleDesc(argv, "+MetaLBGpuTolerance", &_lb_args.metaLbGpuTolerance(),
+                      "max/avg GPU device load above which MetaLB balances");
+  if (_lb_args.metaLbGpuTolerance() <= 1.0) _lb_args.metaLbGpuTolerance() = 1.1;
 
   if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr)
   {
@@ -373,9 +401,39 @@ void _loadbalancerInit()
                         "Write to File: Load Balancing Object to Processor Map decisions "
                         "during LB Simulation");
 
+  // Asynchronous load balancing: AtSyncStart() returns without waiting for the
+  // step it joins, and AtSyncWait() is the separate rendezvous for its
+  // completion.
+  _lb_args.lbAsync() = CmiGetArgFlagDesc(
+      argv, "+LBAsync",
+      "AtSyncStart returns immediately; AtSyncWait waits for the step's migrations");
+  _lb_args.asyncFromFlag() = _lb_args.lbAsync();
+  _lb_args.lbPeerDecision() = CmiGetArgFlagDesc(
+      argv, "+LBPeerDecision",
+      "Send each PE only the moves of a centralized decision it is the source of, "
+      "instead of broadcasting the whole decision");
+  // Forced under +LBAsync: a location-update broadcast can race a migration
+  // made while the application runs, and a device zerocopy sender reading the
+  // stale entry picks its transfer mode for the process the element just left
+  // -- a MEMCPY chosen that way hands the receiver a pointer into an address
+  // space it cannot read. The price is that a bystander keeps a stale entry
+  // and pays the forwarding hop until the location repair reaches it, so an
+  // application that sends nothing device-to-device can opt out with
+  // CHARM_LB_ASYNC_NO_PEER_DECISION=1.
+  if (_lb_args.lbAsync() && getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL)
+    _lb_args.lbPeerDecision() = true;
+  CmiGetArgIntDesc(argv, "+LBScatterThreshold", &_lb_args.scatterThreshold(),
+                   "With +LBPeerDecision, a span of at most this many PEs gets the "
+                   "decision by broadcast rather than by scatter (default 32)");
+  if (_lb_args.scatterThreshold() < 1) _lb_args.scatterThreshold() = 1;
+
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
       argv, "+LBSyncResume", "LB performs a barrier after migration is finished");
+  // AtSyncWait() means "every migration this step planned, everywhere, is
+  // done". Only the sync-resume reduction gives that; a per-PE resume would let
+  // a waiter return while other PEs were still moving objects.
+  if (_lb_args.lbAsync()) _lb_args.syncResume() = true;
 
   // both +LBDebug and +LBDebug level should work
   if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(),
@@ -492,6 +550,9 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSimProcs");
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
+  _registerCommandLineOpt("+LBAsync");
+  _registerCommandLineOpt("+LBPeerDecision");
+  _registerCommandLineOpt("+LBScatterThreshold");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
@@ -503,6 +564,8 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
+  _registerCommandLineOpt("+MetaLBGpuTrigger");
+  _registerCommandLineOpt("+MetaLBGpuTolerance");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
 }
@@ -556,6 +619,11 @@ void LBManager::init(void)
   CkpvAccess(lbmanagerInited) = true;
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
+  // Move-ledger stall report; costs two loads per second while no step drains.
+  CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)ledgerWatch, this);
+#if CMK_CUDA
+  hapiCuptiSetAsyncLB(_lb_args.lbAsync());
+#endif
 #endif
   objLoadsCollecting = false;
   // Registered through the C-level table, which exists since ConverseInit:
@@ -737,6 +805,108 @@ void LBManager::Migrated(LDObjHandle h, int waitBarrier)
   if (loadbalancers.size() > 0) loadbalancers[currentLBIndex]->Migrated(waitBarrier);
 }
 
+// ---- Move ledger (see LBManager.h for the contract) --------------------------
+
+void LBManager::ledgerOpen(int step)
+{
+  if (ledgerActive)
+    CkAbort("[%d] LBManager: move ledger for step %d opened while step %d is "
+            "still draining (%zu moves outstanding): overlapping balancer steps\n",
+            CkMyPe(), step, ledgerStep, ledgerEntries.size());
+  ledgerEntries.clear();
+  ledgerRecording = true;
+  ledgerActive = true;
+  ledgerClosed = false;
+  ledgerStep = step;
+  ledgerOpenTime = ledgerLastWarn = CkWallTimer();
+  ledgerDoneFn = nullptr;
+}
+
+int LBManager::ledgerRecord(int locMgr, CmiUInt8 id, int toPe)
+{
+  if (!ledgerRecording) return -1;
+  // A second decision for the same element in one step is still one move:
+  // keep one entry.
+  ledgerEntries[std::make_pair(locMgr, id)] = toPe;
+  return ledgerStep;
+}
+
+void LBManager::ledgerClose(std::function<void()> done)
+{
+  if (!ledgerActive)
+  {
+    // Never opened: nothing to wait for.
+    done();
+    return;
+  }
+  ledgerRecording = false;
+  ledgerClosed = true;
+  ledgerDoneFn = std::move(done);
+  maybeFireLedger();
+}
+
+void LBManager::ledgerRetire(int locMgr, CmiUInt8 id, int step)
+{
+  auto it = ledgerEntries.find(std::make_pair(locMgr, id));
+  if (!ledgerActive || it == ledgerEntries.end() || step != ledgerStep)
+    CkAbort("[%d] LBManager: move-ledger ack for element %llu (location manager %d) "
+            "of step %d matches nothing here (ledger %s, step %d, %zu outstanding): "
+            "a duplicate registration ack or a straggler from another step\n",
+            CkMyPe(), (unsigned long long)id, locMgr, step,
+            ledgerActive ? "active" : "inactive", ledgerStep, ledgerEntries.size());
+  ledgerEntries.erase(it);
+  maybeFireLedger();
+}
+
+void LBManager::ledgerRetireLocal(int locMgr, CmiUInt8 id, const char* why)
+{
+  auto it = ledgerEntries.find(std::make_pair(locMgr, id));
+  if (it == ledgerEntries.end()) return;
+  if (_lb_args.debug())
+    CkPrintf("[%d] LBManager: retiring the move of element %llu here (%s); no "
+             "destination will ack it\n",
+             CkMyPe(), (unsigned long long)id, why);
+  ledgerEntries.erase(it);
+  maybeFireLedger();
+}
+
+void LBManager::maybeFireLedger()
+{
+  if (!ledgerActive || !ledgerClosed || !ledgerEntries.empty()) return;
+  ledgerActive = false;
+  ledgerClosed = false;
+  std::function<void()> fn;
+  fn.swap(ledgerDoneFn);
+  if (fn) fn();
+}
+
+// Once a second: a ledger that stays non-empty is a step that cannot resume,
+// and it can name the moves holding it. Reported every ten seconds.
+void LBManager::ledgerWatch(void* arg)
+{
+  LBManager* mgr = (LBManager*)arg;
+  if (!mgr->ledgerActive || mgr->ledgerEntries.empty()) return;
+  const double now = CkWallTimer();
+  if (now - mgr->ledgerLastWarn < 10.0) return;
+  mgr->ledgerLastWarn = now;
+  CkPrintf("[%d] LBManager: step %d has %zu move(s) outstanding after %.0f s%s:\n",
+           CkMyPe(), mgr->ledgerStep, mgr->ledgerEntries.size(),
+           now - mgr->ledgerOpenTime,
+           mgr->ledgerClosed ? "" : " (decision loop still open)");
+  int shown = 0;
+  for (const auto& kv : mgr->ledgerEntries)
+  {
+    if (++shown > 8)
+    {
+      CkPrintf("[%d]   ... and %zu more\n", CkMyPe(), mgr->ledgerEntries.size() - 8);
+      break;
+    }
+    CkPrintf("[%d]   element %llu (location manager %d) -> PE %d\n", CkMyPe(),
+             (unsigned long long)kv.first.second, kv.first.first, kv.second);
+  }
+  fflush(stdout);
+}
+
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
 
 void LBManager::get_avail_vector(char* bitmap) const
@@ -822,6 +992,42 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
   if (loadbalancers.size() < seq + 1)
     loadbalancers.resize(seq + 1);
   loadbalancers[seq] = lb;
+}
+
+// Asynchronous balancing requested by the application (CkLBSetAsync). What
+// +LBAsync implies at startup is derived here the same way. _lb_args is shared
+// by every PE of the process, so one branch per process would do, but every
+// branch runs it so the order of arrival does not matter.
+static void lbApplyAsync(bool on)
+{
+  if (_lb_args.asyncFromFlag()) return;  // the command line already decided
+  _lb_args.lbAsync() = on;
+  if (on)
+  {
+    _lb_args.syncResume() = true;
+    if (getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL) _lb_args.lbPeerDecision() = true;
+  }
+#if CMK_CUDA && CMK_LBDB_ON
+  hapiCuptiSetAsyncLB(on);
+#endif
+}
+
+void LBManager::setAsyncMode(bool on) { lbApplyAsync(on); }
+
+void CkLBSetAsync(bool on)
+{
+  // This process at once (its PEs share _lb_args), every other PE by broadcast
+  // once the group exists.
+  lbApplyAsync(on);
+  if (CkMyPe() == 0)
+    CmiPrintf("CharmLB> asynchronous balancing %s by the application%s\n", on ? "on" : "off",
+              _lb_args.asyncFromFlag() ? " (ignored: +LBAsync was given)" : "");
+#if CMK_LBDB_ON
+  if (lbmgrCreated)
+    CProxy_LBManager(_lbmgr).setAsyncMode(on);
+  else
+    pendingAsyncRequest = on ? 1 : 0;
+#endif
 }
 
 // switch strategy in order
@@ -975,6 +1181,7 @@ void LBManager::ResetAdaptive()
 void LBManager::ResumeClients()
 {
 #if CMK_LBDB_ON
+  resume_epoch++;
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)

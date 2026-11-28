@@ -237,6 +237,15 @@ struct LBKernelRecord {
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
+  // Wall time this object's measurement window was open during the interval
+  // (LBObj::windowTime). Under +LBAsync that is from its reopen, once the step's
+  // migrations are over, until its own join -- less than the time it was
+  // active, deliberately: an object's rate depends on where it runs, so the
+  // move is not measured. The database scales the host load and traffic it
+  // hands out by activeSpan/windowTime (LBDatabase::GetObjData, GetCommData),
+  // so every strategy sees rates over the object's active time; this is the
+  // window they came from, for diagnosis and for the simulator.
+  LBRealType windowTime;
 #if CMK_CUDA
   // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
   // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
@@ -428,6 +437,9 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
+  // LB format 6. An older dump has no such field.
+  if (_lb_version > 5) p|windowTime;
+  else if (p.isUnpacking()) windowTime = 0;
 #if CMK_CUDA
   p|gpuTime;
 #endif
