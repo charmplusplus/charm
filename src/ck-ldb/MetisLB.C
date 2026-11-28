@@ -786,6 +786,13 @@ void MetisLB::work(LDStats* stats)
       // Did METIS keep the anchors apart? Then part q is named after the
       // anchor it holds. Otherwise the caller names the parts after the fixed
       // objects their vertices talk to most, the best that is left.
+      //
+      // Part q was sized by target q, so naming it after anchor p is right
+      // only when targets p and q are the same share, as the relabels require
+      // (kRelabelShareTolerance): on a PE that already carries fixed load the
+      // target is smaller, and a part sized for an empty PE named after it
+      // overloads it by the difference. Such a naming falls back to the
+      // caller's share-respecting relabel.
       std::vector<int> label(nparts, -1);
       bool distinct = true;
       for (idx_t p = 0; p < nparts && distinct; p++)
@@ -793,6 +800,18 @@ void MetisLB::work(LDStats* stats)
         const idx_t q = partsAll[nv + p];
         if (q < 0 || q >= nparts || label[q] >= 0) distinct = false;
         else label[q] = (int)p;
+      }
+      for (idx_t q = 0; q < nparts && distinct && tpwgts != nullptr; q++)
+      {
+        const idx_t p = label[q];
+        if (p == q) continue;
+        for (int c = 0; c < ncon_in && distinct; c++)
+        {
+          const double shareQ = (*tpwgts)[(size_t)q * ncon_in + c];
+          const double shareP = (*tpwgts)[(size_t)p * ncon_in + c];
+          const double scale = std::max(1e-12, std::max(std::fabs(shareQ), std::fabs(shareP)));
+          if (std::fabs(shareQ - shareP) > kRelabelShareTolerance * scale) distinct = false;
+        }
       }
       if (distinct)
       {
