@@ -738,6 +738,17 @@ public:
     if (ck::objid::_objidDiag && pe == -1) ck::objid::locTable().counters().missNoLocation++;
     return pe;
   }
+  /// whichPe(idx); on a miss for an index with an id, also ask the home (once per
+  /// process) so that a later lookup has the answer. A send to an element that lives
+  /// at its home is delivered there directly and never brings this PE its location.
+  /// An index without an id is asked for by the send itself (bufferForLocation).
+  int whichPeOrRequest(const CkArrayIndex& idx)
+  {
+    const int pe = whichPe(idx);
+    CmiUInt8 id;
+    if (pe == -1 && lookupID(idx, id)) return requestLocation(id);
+    return pe;
+  }
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const
   {
