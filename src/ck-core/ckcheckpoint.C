@@ -33,6 +33,16 @@ void noopit(const char*, ...)
 CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
 
+// On this PE: migrateMe requests sent and handled, array elements sent and received.
+struct PeMigrations
+{
+  long long started = 0, finished = 0;
+};
+CkpvStaticDeclare(PeMigrations, peMigrations);
+void CkInitMigrationCounts() { CkpvInitialize(PeMigrations, peMigrations); }
+void CkMigrationStarted() { CkpvAccess(peMigrations).started++; }
+void CkMigrationFinished() { CkpvAccess(peMigrations).finished++; }
+
 struct GroupInfo
 {
   CkGroupID gID;
@@ -227,9 +237,10 @@ private:
   int index = 0;
   bool inProgress = false;
 
-  const char* dirname;
+  std::string dirname;  // the message holding the parameter is freed after Checkpoint
   CkCallback cb;
   bool requestStatus;
+  long long lastFinished = -1;  // on node 0
 
 public:
   CkCheckpointWriteMgr() {}
@@ -246,13 +257,32 @@ public:
 
     if (writersPerNode > 0) numWriters = std::min(writersPerNode, nodeSize);
 
-    // Save params for future invocations and kick off the first numWriters PEs to start
-    // checkpointing
     this->dirname = dirname;
     this->cb = cb;
     this->requestStatus = requestStatus;
+    // The writes wait until no array element is inside a migration message or
+    // has a migrateMe request queued, since no PE would write it. This node's
+    // PEs count first once it has the request, so Write comes after it.
+    for (int pe = firstPE; pe < firstPE + nodeSize; pe++)
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[pe].CountMigrations();
+  }
+
+  // On node 0: if all migrations started by this count had finished by the
+  // previous one, none was in progress between them (four-counter method).
+  void MigrationCounts(CkReductionMsg* m)
+  {
+    const long long* counts = (const long long*)m->getData();
+    bool settled = counts[0] == lastFinished;
+    lastFinished = settled ? -1 : counts[1];
+    delete m;
+    if (settled) thisProxy.Write();
+    else CProxy_CkCheckpointMgr(_sysChkptMgr).CountMigrations();
+  }
+
+  void Write()
+  {
     for (index = firstPE; index < firstPE + numWriters; index++)
-      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname.c_str(), cb, requestStatus);
   }
 
   void FinishedCheckpoint()
@@ -262,7 +292,7 @@ public:
     // If there's another PE to kick off, do so
     if (index < firstPE + nodeSize)
     {
-      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname.c_str(), cb, requestStatus);
       index++;
     }
     // If there isn't, then check if all the PEs are finished
@@ -287,8 +317,19 @@ public:
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
 	void Checkpoint(const char *dirname, CkCallback cb, bool requestStatus = false);
 	void SendRestartCB(void);
+	void CountMigrations(void);
 	void pup(PUP::er& p){ p|restartCB; }
 };
+
+// Each PE counts in its own scheduler, after any entry method it is running,
+// so a migrateMe called after the contribute that led to the checkpoint is seen.
+void CkCheckpointMgr::CountMigrations(void)
+{
+  long long counts[2] = {CkpvAccess(peMigrations).started, CkpvAccess(peMigrations).finished};
+  contribute(sizeof(counts), counts, CkReduction::sum_long_long,
+             CkCallback(CkIndex_CkCheckpointWriteMgr::MigrationCounts(NULL),
+                        CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)[0]));
+}
 
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){

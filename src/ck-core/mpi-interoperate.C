@@ -222,13 +222,14 @@ int CharmInteropPickRendezvous(char *host, int hostlen) {
 #endif
 }
 
-// MPI interop with LCT's tcp bootstrap, which needs no PMI client and no MPI
-// in LCI: the caller supplies rank, size and the rendezvous endpoint (rank 0
-// listens there). An LCT_PMI_BACKEND set by the user is left alone.
-void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
-                          const char *host, int port, int argc, char **argv) {
+// Selects LCT's tcp bootstrap for the LCI start that follows. It needs no PMI
+// client and no MPI in LCI: the caller supplies rank, size and the rendezvous
+// endpoint (rank 0 listens there). An LCT_PMI_BACKEND set by the user is left
+// alone.
+void CharmInteropSetTcpBootstrap(int rank, int size, int local_rank,
+                                 int local_size, const char *host, int port) {
 #if defined(_WIN32)
-  CmiAbort("CharmLibInit: MPI interop is not supported on Windows");
+  CmiAbort("MPI interop is not supported on Windows");
 #else
   if (getenv("LCT_PMI_BACKEND") == nullptr) {
     char buf[32];
@@ -245,8 +246,54 @@ void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
     snprintf(buf, sizeof(buf), "%d", port);
     setenv("LCT_MASTER_PORT", buf, 1);
   }
-  CharmLibInitWorld(argc, argv);
 #endif
+}
+
+// MPI interop, library mode, with LCT's tcp bootstrap.
+void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
+                          const char *host, int port, int argc, char **argv) {
+  CharmInteropSetTcpBootstrap(rank, size, local_rank, local_size, host, port);
+  CharmLibInitWorld(argc, argv);
+}
+
+// MPI interop, main mode (CharmMpiMain): what the MPI side expects of the
+// Charm++ start that follows. Checked by _interopCheckStart.
+static bool _mpiMainMode = false;
+static int _mpiMainRank = -1, _mpiMainSize = 0;
+static bool _mpiMainSerialized = false;
+static char _mpiMainUserPmi[32] = "";
+
+// Starts Charm++ as an ordinary run, in a process whose MPI rank is rank of
+// size and whose MPI thread level is at least MPI_THREAD_SERIALIZED if
+// serialized is nonzero. Does not return.
+int CharmMpiMainStart(int rank, int size, int serialized, const char *userPmi,
+                      int argc, char **argv) {
+  _mpiMainMode = true;
+  _mpiMainRank = rank;
+  _mpiMainSize = size;
+  _mpiMainSerialized = serialized != 0;
+  snprintf(_mpiMainUserPmi, sizeof(_mpiMainUserPmi), "%s", userPmi ? userPmi : "");
+  return charm_main(argc, argv);
+}
+
+// Called by _initCharm on rank 0 of every process. In main mode, aborts
+// (through CharmMpiMain's abort hook, which ends the MPI job) unless Charm++
+// process i is MPI rank i and the MPI thread level covers this process's PEs.
+void _interopCheckStart() {
+  if (!_mpiMainMode) return;
+  if (CmiMyNode() != _mpiMainRank || CmiNumNodes() != _mpiMainSize)
+    CmiAbort("CharmMpiMain: Charm++ process %d of %d is MPI_COMM_WORLD rank %d "
+             "of %d; the launcher gave Charm++ and MPI different process "
+             "numbering, which MPI interop requires to match.%s",
+             CmiMyNode(), CmiNumNodes(), _mpiMainRank, _mpiMainSize,
+             _mpiMainUserPmi[0] ? " LCT_PMI_BACKEND is set in the environment, "
+             "so LCI did not use the tcp bootstrap that CharmMpiMain sets up; "
+             "unset it for MPI interop." : "");
+  if (CmiMyNodeSize() > 1 && !_mpiMainSerialized)
+    CmiAbort("CharmMpiMain: this process has %d PEs, but MPI provides a thread "
+             "level below MPI_THREAD_SERIALIZED. Use an MPI library that "
+             "provides it (if the program initializes MPI itself, with "
+             "MPI_Init_thread), or run one PE per process.", CmiMyNodeSize());
 }
 
 // CharmLibExit is called for both forms of interop when the application is

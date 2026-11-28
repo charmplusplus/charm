@@ -108,6 +108,8 @@ Runtime (reconverse):
   main also works (#4055, reconverse #288). A CkAbort or CmiAbort in
   any process ends the whole MPI job through MPI_Abort (#4254,
   reconverse #326). CharmLibExit returns the code given to CkExit.
+  A program with a mainchare runs as an ordinary Charm++ run inside an
+  MPI job with CharmMpiMain or charmc -mpi-main (reconverse #345).
 
 - Tracing: with tracing compiled out, [local] and [inline] calls no
   longer evaluate trace arguments, which crashed hello/local and
@@ -637,7 +639,7 @@ Build and packaging:
   rebuild with --force (#4256).
 
 - The charm4py target builds and loads on reconverse: libcharm links
-  reconverse, which is built with CMK_CHARM4PY (#4063).
+  reconverse (#4063).
 
 - --build-shared links on reconverse: charmc searches lib_so/, where
   libreconverse and LCI's libraries are, and records it as an RPATH,
