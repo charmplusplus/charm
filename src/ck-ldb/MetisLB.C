@@ -56,21 +56,35 @@ static bool metisHostTight()
 // message is the same on the hot PE and the median one; and the measured
 // wallTime, inflated on crowded PEs, left the groups' host sums 1.4-3.5x apart
 // even with the host constraint at 1.1.
-static bool metisHostByMsgs()
+// With neither flag the choice follows the job: message counts when objects
+// carry device load (on sph3d and leanmd the host time is message handling),
+// the measured or declared host time when none does -- there host time is the
+// work itself, and message counts would weigh a heavy object like a light one.
+// Returns 1 for message counts, 0 for host time, -1 for that default.
+static int metisHostWeightFlag()
 {
-  static int on = -1;
-  if (on < 0)
+  static int mode = -2;
+  if (mode == -2)
   {
-    // Default since 2026-10-18 (it was measured better on sph3d and leanmd's
-    // host time is message handling too); +LBMetisHostByTime restores the
-    // measured wallTime weights.
     const bool byTime = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByTime",
                            "MetisLB: host weights from measured host time instead of message counts");
-    CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByMsgs",
-                      "(default) MetisLB: host weights from message counts, not measured time");
-    on = byTime ? 0 : 1;
+    const bool byMsgs = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByMsgs",
+                      "MetisLB: host weights from message counts, not measured time");
+    mode = byTime ? 0 : (byMsgs ? 1 : -1);
   }
-  return on == 1;
+  return mode;
+}
+static bool metisHostByMsgs(const BaseLB::LDStats* stats)
+{
+  const int mode = metisHostWeightFlag();
+  if (mode >= 0) return mode == 1;
+#if CMK_GPU
+  for (const LDObjData& o : stats->objData)
+    if (o.gpuTime > 0.0) return true;
+#else
+  (void)stats;
+#endif
+  return false;
 }
 static bool metisRemapOn();
 static double metisMinGain();
@@ -88,7 +102,7 @@ MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
   metisMinGain();
   metisMaxCutRise();
   metisHostTight();
-  metisHostByMsgs();
+  metisHostWeightFlag();
   // A partitioner is only as good as its edges. Communication instrumentation
   // is off by default, and MetisLB run on its own had been partitioning a
   // graph with no edges at all (every cut reported 0.0): its output was an
@@ -334,6 +348,7 @@ void MetisLB::work(LDStats* stats)
   // message count scaled to it once the comm graph is merged below.
   std::vector<double> hostW(numVertices);
   for (int i = 0; i < numVertices; i++) hostW[i] = (double)stats->objData[i].wallTime;
+  const bool hostByMsgs = metisHostByMsgs(stats);
 #if CMK_GPU
   {
     const LBCriticality crit = lbCriticalityOf(stats);
@@ -387,7 +402,7 @@ void MetisLB::work(LDStats* stats)
              "edge(s), merged %d duplicate edge(s) of %zu\n",
              selfLoops, outOfRange, duplicates, rawEdges);
 
-  if (metisHostByMsgs())
+  if (hostByMsgs)
   {
     double sumT = 0.0, sumM = 0.0;
     std::vector<double> msgs(numVertices, 0.0);
@@ -1134,7 +1149,7 @@ void MetisLB::work(LDStats* stats)
   for (size_t k = 0; k < migVerts.size(); k++)
     grpVerts[groupLabel[k]].push_back(migVerts[k]);
 
-  if (metisHostByMsgs())
+  if (hostByMsgs)
   {
     // Level one has fixed every object's group, so each of its edges now has a
     // tier: the same group (one process), another group on this node, or
@@ -1493,7 +1508,7 @@ void MetisLB::work(LDStats* stats)
       // where the host actually spends 2-9 us. That overcharge refused a
       // mapping that measured -36% (sph3d 98M, 256 patches, 2 nodes,
       // 2026-10-08: predicted 4.50 -> 4.46, 0.8%, floor 10%).
-      const bool byMsgs = metisHostByMsgs();
+      const bool byMsgs = hostByMsgs;
       std::vector<double> hw;
       if (byMsgs)
       {
