@@ -8,8 +8,15 @@ group [migratable] DistBaseLB: BaseLB {
   entry void DistBaseLB(const CkLBOptions &);  
   entry void LoadBalance();
   entry [reductiontarget] void barrierDone();
+  // Sent to every PE of a process by the PE that built the round's GPU loads;
+  // see the arrival check in barrierDone.
+  entry [expedited] void gpuLoadsReady();
   entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
+  // A source PE's moves, broadcast so that every other PE's location cache
+  // stays current for them (DistBaseLB::BroadcastLocationUpdate). Declared
+  // unconditionally; nothing sends it unless CMK_GLOBAL_LOCATION_UPDATE is on.
+  entry void ReceiveLocationUpdate(LBMigrateMsg*);
 };
 
 };

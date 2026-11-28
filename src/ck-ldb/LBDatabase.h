@@ -83,11 +83,15 @@ public:
   // Copy the per-object normalized GPU loads computed by
   // hapiNormalizeCuptiLoads into this PE's LB objects. The map is shared
   // per-process and every PE reads it concurrently, so this must not mutate it.
+  // An object whose application declared its load this interval keeps the
+  // declaration (LBObj::gpuDeclared).
   inline void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {
     for (size_t i = 0; i < objs.size(); i++) {
       if (objs[i].obj == nullptr)
+        continue;
+      if (objs[i].obj->hasGPUDeclared())
         continue;
       const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
       LDObjKey key;
@@ -99,6 +103,24 @@ public:
       objs[i].obj->setGPUTiming(it->second);
     }
   }
+
+  inline void ObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos) {
+    LbObj(h)->setPosition(pos);
+  };
+  inline const std::vector<LBRealType>& GetObjPosition(LDObjHandle h) {
+    return LbObj(h)->getPosition();
+  };
+
+  // Replication declaration; see LDObjData::replicaGroup.
+  inline void ObjReplica(LDObjHandle h, int group, int rank, int count, int maxCount, size_t extraBytes,
+                         double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                         size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0) {
+    LbObj(h)->setReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                         exchangeBytes, exchangeMsgs, extraPerPeer);
+  };
+  inline void GetObjReplica(LDObjHandle h, int& group, int& rank, int& count, int& maxCount, size_t& extraBytes) {
+    LbObj(h)->getReplica(group, rank, count, maxCount, extraBytes);
+  };
 
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
@@ -155,6 +177,17 @@ public:
 
   LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
   int Migrate(LDObjHandle h, int dest);
+  // The balancer's replication decisions, delivered to the object's manager
+  // (LDCallbacks::clone / retire). Return 1 when the object was found, 0 when
+  // the handle no longer names it (it died, or its slot was reused since the
+  // statistics the decision was planned from).
+  int Clone(LDObjHandle h, int dest, int rank);
+  int Retire(LDObjHandle h);
+  int CloneNotice(LDObjHandle h, int dest, int rank);
+  int RetireNotice(LDObjHandle h, int rank);
+private:
+  LBObj* replicaTarget(const LDObjHandle& h, const char* what) const;
+public:
   void UnregisterOM(LDOMHandle omh);
   void RegisteringObjects(LDOMHandle omh);
   void DoneRegisteringObjects(LDOMHandle omh);
@@ -195,6 +228,13 @@ public:
   };
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();
+  }
+  // The handle of the object in slot idx, when the slot still holds the
+  // object with this id (GetObjHandle dereferences an empty slot).
+  inline bool LiveObjHandle(int idx, CmiUInt8 id, LDObjHandle& h) const {
+    if (idx < 0 || (size_t)idx >= objs.size() || objs[idx].obj == nullptr) return false;
+    h = objs[idx].obj->GetLDObjHandle();
+    return h.id == id;
   }
   void CollectStatsOn(void);
   inline void CollectStatsOff(void) { TurnStatsOff(); };

@@ -9,6 +9,12 @@
 
 #if CMK_LBDB_ON
 
+// LB timing instrumentation (declared in BaseLB.h, used by DiffusionLB).
+double BaseLB::totalLBTime = 0.0;
+double BaseLB::lbStartTime = 0.0;
+double BaseLB::totalLBStrategyTime = 0.0;
+int BaseLB::totalPhases = 0;
+
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
@@ -422,7 +428,7 @@ void BaseLB::LDStats::pup(PUP::er &p)
   }
 }
 
-int BaseLB::LDStats::useMem() { 
+int BaseLB::LDStats::useMem() {
   // calculate the memory usage of this LB (superclass).
   return sizeof(LDStats) + sizeof(ProcStats) * procs.size() +
 	 (sizeof(LDObjData) + 2 * sizeof(int)) * objData.size() +

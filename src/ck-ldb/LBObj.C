@@ -30,6 +30,7 @@ void LBObj::Clear(void)
 #endif
 #if CMK_CUDA
   data.gpuTime = 0.;
+  data.driverTime = 0.;
   data.gpuPupSize = 0;
 #endif
 }

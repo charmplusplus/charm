@@ -19,6 +19,25 @@ public:
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
+    // Unknown until the application declares them (setPupSize/setGPUPupSize).
+    // Left uninitialised these reached the cost model as garbage -- 10^16
+    // bytes per object, a migration priced at 10^8 seconds -- and every priced
+    // decision refused to move anything.
+    data.pupSize = 0;
+#if CMK_GPU
+    data.gpuPupSize = 0;
+#endif
+    // Not replicable until the application declares it (setLBReplica).
+    data.replicaGroup = -1;
+    data.replicaRank = 0;
+    data.replicaCount = 1;
+    data.replicaMax = 1;
+    data.replicaExtraBytes = 0;
+    data.replicaCostNode = data.replicaCostRemote = 0.0;
+    data.replicaParts = 0;
+    data.replicaExchangeBytes = 0;
+    data.replicaExchangeMsgs = 0.0;
+    data.replicaExtraBytesPerPeer = 0;
     Clear();
 //    data.cpuTime = 0.;
 //    data.wallTime = 0.;
@@ -41,6 +60,18 @@ public:
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);
   void IncrementGPUTime(LBRealType gputime);
+
+  // The application declared this object's device load for the current
+  // interval (EstObjGPULoad), so the CUPTI attribution must not replace it.
+  // An application that declares knows its cost before the work runs -- moe
+  // prices an expert at its token count times a measured rate -- and the
+  // attribution can be far off it: measured on moe, CUPTI credited the
+  // experts with 17% of the interval while the devices were 68-77% busy.
+  // Cleared with the loads at each balancing step, so an object that stops
+  // declaring goes back to being measured.
+  bool gpuDeclared = false;
+  inline void setGPUDeclared(bool v) { gpuDeclared = v; }
+  inline bool hasGPUDeclared(void) const { return gpuDeclared; }
 
   inline void StartTimer(void) {
 	startWTime = CkWallTimer();
@@ -79,6 +110,38 @@ public:
 #if CMK_LB_CPUTIMER
     data.cpuTime = cputime;
 #endif
+  }
+
+  // Object position, for geometric load balancers (DiffusionLB's centroid
+  // metric). Empty unless the application calls CkMigratable::setObjPosition,
+  // so every reader has to cope with a zero-length vector.
+  inline void setPosition(const std::vector<LBRealType>& pos) { data.position = pos; }
+  inline const std::vector<LBRealType>& getPosition() const { return data.position; }
+
+  // Replication declaration; see LDObjData::replicaGroup.
+  inline void setReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
+                         double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                         size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0)
+  {
+    data.replicaGroup = group;
+    data.replicaRank = rank;
+    data.replicaCount = count;
+    data.replicaMax = maxCount;
+    data.replicaExtraBytes = extraBytes;
+    data.replicaCostNode = costNode;
+    data.replicaCostRemote = costRemote;
+    data.replicaParts = parts;
+    data.replicaExchangeBytes = exchangeBytes;
+    data.replicaExchangeMsgs = exchangeMsgs;
+    data.replicaExtraBytesPerPeer = extraPerPeer;
+  }
+  inline void getReplica(int& group, int& rank, int& count, int& maxCount, size_t& extraBytes) const
+  {
+    group = data.replicaGroup;
+    rank = data.replicaRank;
+    count = data.replicaCount;
+    maxCount = data.replicaMax;
+    extraBytes = data.replicaExtraBytes;
   }
 
   inline void getGPUTime(LBRealType *w)

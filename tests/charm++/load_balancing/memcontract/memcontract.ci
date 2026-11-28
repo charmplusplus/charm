@@ -1,0 +1,5 @@
+mainmodule memcontract {
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+  };
+};

@@ -4,6 +4,7 @@ set(ck-cxx-sources
     ../ck-ldb/BaseLB.C ../ck-ldb/CentralLB.C
     ../ck-ldb/CentralPredictor.C ../ck-ldb/ckgraph.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
+    ../ck-ldb/DiffusionCostModel.C
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
@@ -55,11 +56,13 @@ set(ldb-cxx-sources
 
 
 set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
+    ../ck-ldb/DiffusionCostModel.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/GreedyRefineCentralGPULB.h
     ../ck-ldb/LBComm.h
-    ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
+    ../ck-ldb/LBDatabase.h ../ck-ldb/LBLoadDim.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h
+    ../ck-ldb/LBMemoryContract.h ../ck-ldb/LBMigrateWindow.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
     ../ck-ldb/RandomForestModel.h

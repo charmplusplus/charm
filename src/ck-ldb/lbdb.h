@@ -6,6 +6,9 @@
 #ifndef LBDBH_H
 #define LBDBH_H
 
+/* First: reconverse's converse.h does not pull in conv-mach-opt.h, and the
+   CMK_GPU / CMK_CUDA tests below must see the build options. */
+#include "conv-mach-opt.h"
 #include "converse.h"
 #include "charm.h"
 #include "middle.h"
@@ -237,10 +240,16 @@ struct LBKernelRecord {
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
-#if CMK_CUDA
+#if CMK_GPU
   // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
   // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
   LBRealType gpuTime;
+  // The object's share of its process's driver time: the host time spent
+  // inside GPU runtime calls, which several PEs on one context serialise
+  // between them -- the launch term of LBLoadDim.h. Zero unless the runtime
+  // attributes runtime-API time to objects, which this runtime does not yet;
+  // the group dimension is then device time.
+  LBRealType driverTime;
 #endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
@@ -250,19 +259,69 @@ struct LDObjData {
 #endif
   bool migratable;
   bool asyncArrival;
+  // Object position, for geometric load balancers (DiffusionLB's centroid
+  // metric), set by the application through CkMigratable::setObjPosition.
+  // Empty for an object that never declares one, so every reader must guard
+  // for a zero-length vector.
+  std::vector<LBRealType> position;
 #if CMK_LB_USER_DATA
   LBObjUserData   userData;
 #endif
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
-#if CMK_CUDA
+#if CMK_GPU
   // Device bytes the object would pack, exactly rather than encoded: a device
   // buffer is sized in megabytes where pupSize's approximation is tuned for
   // host state, and a balancer weighing a migration against free device memory
   // needs the real figure.
   size_t gpuPupSize;
 #endif
+  // Replication, declared by the application (CkMigratable::setLBReplica).
+  // replicaGroup < 0: the object cannot be replicated, which is the default
+  // and what every object that never declares has. Otherwise the objects
+  // sharing a group are copies of one logical object: replicaRank is this
+  // copy's index, replicaCount how many copies exist now, replicaMax how many
+  // the application can keep consistent, and replicaExtraBytes what one copy
+  // holds on its device beyond the object's own footprint (the state the
+  // copies exchange). A balancer that understands groups (ShedLB) may ask for
+  // a copy to be made or retired; see LBAction and CkMigratable::ckClone.
+  // The balancer counts a copy as its share of the group's load plus its
+  // exchanges with every other copy (replicaCostNode / replicaCostRemote below).
+  // replicaParts: the number of fixed partitions the application splits the
+  // object's work into, when copy r of k serves the contiguous block of
+  // partitions [floor(parts r / k), floor(parts (r + 1) / k)) and so carries
+  // that block's share of the load rather than 1/k of it (the example's four
+  // dispatcher partitions: three copies carry 1/4, 1/4 and 1/2); 0 means
+  // equal shares.
+  int replicaGroup;
+  int replicaRank;
+  int replicaCount;
+  int replicaMax;
+  size_t replicaExtraBytes;
+  // replicaCostNode / replicaCostRemote: what the copy MEASURED its exchange
+  // with one peer to cost it (same units as the load, per balancing interval),
+  // 0 while it has not exchanged. replicaExchangeBytes / replicaExchangeMsgs:
+  // what it sends to each peer per interval, from which the balancer prices an
+  // exchange it has no measurement of, with the calibrated transfer-cost table
+  // (DiffusionCostConfig::exchangePerPeer, by the group's copy count).
+  // replicaExtraBytesPerPeer: the device bytes each further peer adds to a copy
+  // (its landing buffers), beyond replicaExtraBytes.
+  double replicaCostNode;
+  double replicaCostRemote;
+  int replicaParts;
+  size_t replicaExchangeBytes;
+  double replicaExchangeMsgs;
+  size_t replicaExtraBytesPerPeer;
+  // The device bytes a copy holds beyond the object's footprint in a group of k.
+  inline size_t replicaExtraFor(int k) const { return replicaExtraBytes + replicaExtraBytesPerPeer * (size_t)(k > 1 ? k - 1 : 0); }
+  // The share of the group's load copy r of k carries under this declaration.
+  inline double replicaShare(int r, int k) const {
+    if (replicaParts <= 0 || k <= 0) return k > 0 ? 1.0 / k : 1.0;
+    const int lo = (replicaParts * r) / k, hi = (replicaParts * (r + 1)) / k;
+    return (double)(hi - lo) / replicaParts;
+  }
+  inline bool replicable() const { return replicaGroup >= 0 && replicaMax > 1; }
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const CmiUInt8 &objID() const { return handle.id; }
@@ -363,6 +422,12 @@ struct LDCommData {
  * Callbacks from database to object managers
  */
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);
+// A balancer's two replication decisions (LDObjData::replicaGroup): make a
+// copy of this object on dest with the given replica rank; retire this copy.
+typedef void (*LDCloneFn)(LDObjHandle handle, int dest, int rank);
+typedef void (*LDRetireFn)(LDObjHandle handle);
+typedef void (*LDCloneNoticeFn)(LDObjHandle handle, int dest, int rank);
+typedef void (*LDRetireNoticeFn)(LDObjHandle handle, int rank);
 typedef void (*LDStatsFn)(LDOMHandle h, int state);
 typedef void (*LDQueryEstLoadFn)(LDOMHandle h);
 typedef void (*LDMetaLBResumeWaitingCharesFn) (LDObjHandle handle, int lb_ideal_period);
@@ -370,6 +435,10 @@ typedef void (*LDMetaLBCallLBOnCharesFn) (LDObjHandle handle);
 
 struct LDCallbacks {
   LDMigrateFn migrate;
+  LDCloneFn clone;
+  LDRetireFn retire;
+  LDCloneNoticeFn cloneNotice;
+  LDRetireNoticeFn retireNotice;
   LDStatsFn setStats;
   LDQueryEstLoadFn queryEstLoad;
   LDMetaLBResumeWaitingCharesFn metaLBResumeWaitingChares;
@@ -428,8 +497,11 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
-#if CMK_CUDA
+#if CMK_GPU
   p|gpuTime;
+  // Format 4 adds the driver time; an older dump has none.
+  if (_lb_version > 3) p|driverTime;
+  else if (p.isUnpacking()) driverTime = 0;
 #endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;
@@ -440,15 +512,36 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
+  // Format 4 adds the position; an older dump has none.
+  if (_lb_version > 3) p|position;
+  else if (p.isUnpacking()) position.clear();
 #if CMK_LB_USER_DATA
   if (_lb_version > 2) {
     p|userData;
   }
 #endif
   p|pupSize;
-#if CMK_CUDA
+#if CMK_GPU
   p|gpuPupSize;
 #endif
+  // Version 8 adds the replication declaration; an older dump has none.
+  if (_lb_version > 7) {
+    p|replicaGroup; p|replicaRank; p|replicaCount; p|replicaMax; p|replicaExtraBytes;
+  } else if (p.isUnpacking()) {
+    replicaGroup = -1; replicaRank = 0; replicaCount = 1; replicaMax = 1; replicaExtraBytes = 0;
+  }
+  // Version 9 adds the copy's recurring exchange cost; an older dump has none.
+  if (_lb_version > 8) {
+    p|replicaCostNode; p|replicaCostRemote;
+  } else if (p.isUnpacking()) {
+    replicaCostNode = replicaCostRemote = 0.0;
+  }
+  // Version 10 adds the partition count behind a copy's share; an older dump has equal shares.
+  if (_lb_version > 9) {
+    p|replicaParts; p|replicaExchangeBytes; p|replicaExchangeMsgs; p|replicaExtraBytesPerPeer;
+  } else if (p.isUnpacking()) {
+    replicaParts = 0; replicaExchangeBytes = 0; replicaExchangeMsgs = 0.0; replicaExtraBytesPerPeer = 0;
+  }
 }
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {

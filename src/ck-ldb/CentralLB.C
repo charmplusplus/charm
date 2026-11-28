@@ -10,6 +10,7 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#include "LBMemoryContract.h"
 
 #if CMK_CUDA
 #include "hapi.h"
@@ -338,9 +339,16 @@ void CentralLB::BuildStatsMsg()
 #else
   msg->pe_speed = myspeed;
 #endif
+  msg->partition = lbmgr->partition();
 #if CMK_CUDA
   msg->gpu_device_id = hapiMyDevice();
   msg->gpu_total_sms = hapiMyDeviceTotalSMs();
+  // Device memory for the memory contract. Under a device pool the pool's
+  // free bytes and the device's are reported apart: the pool is per process
+  // and the device is shared, so LBMemoryModel combines them per device.
+  hapiLBDeviceMemory(&msg->gpu_mem_remaining, &msg->pool_buff_mem_remaining,
+                     &msg->gpu_pool_arena_bytes, &msg->gpu_ipc_slots);
+  msg->gpu_pool_capacity_bytes = hapiLBDevicePoolCapacity();
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
@@ -472,9 +480,15 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
+  procStat.partition = m->partition;
 #if CMK_CUDA
   procStat.gpu_device_id = m->gpu_device_id;
   procStat.gpu_total_sms = m->gpu_total_sms;
+  procStat.gpu_mem_remaining = m->gpu_mem_remaining;
+  procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+  procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+  procStat.gpu_pool_capacity_bytes = m->gpu_pool_capacity_bytes;
+  procStat.gpu_ipc_slots = m->gpu_ipc_slots;
 #endif
 
   //procStat.utilization = 1.0;
@@ -551,9 +565,15 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
+      procStat.partition = m->partition;
 #if CMK_CUDA
       procStat.gpu_device_id = m->gpu_device_id;
       procStat.gpu_total_sms = m->gpu_total_sms;
+      procStat.gpu_mem_remaining = m->gpu_mem_remaining;
+      procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+      procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+      procStat.gpu_pool_capacity_bytes = m->gpu_pool_capacity_bytes;
+      procStat.gpu_ipc_slots = m->gpu_ipc_slots;
 #endif
       //procStat.utilization = 1.0;
       procStat.available = true;
@@ -691,7 +711,60 @@ void CentralLB::ApplyDecision() {
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
 #endif
-  
+
+#if CMK_CUDA
+  // Memory contract, I-batch: partition the decision so each batch fits what
+  // every device can stage and receive, and every PE's IPC slots. One batch
+  // (the usual case) takes the unmodified path below; multiple batches are
+  // stashed here and released sequentially by ReleaseNextBatch as each
+  // completes.
+  {
+    std::vector<int> batchOf;
+    int refused = 0;
+    const int nBatches = LBBatchPlanner::plan(statsData, batchOf, &refused);
+    if (nBatches == 1 && refused > 0) {
+      // The planner took moves back; the message must not carry them.
+      delete migrateMsg;
+      migrateMsg = createMigrateMsg(statsData);
+    }
+    if (nBatches > 1) {
+      int nMoves = 0;
+      for (int i = 0; i < (int)statsData->objData.size(); i++)
+        if (statsData->to_proc[i] != statsData->from_proc[i]) nMoves++;
+      CkPrintf("CharmLB> memory contract: executing this step's %d migrations "
+               "in %d batches\n", nMoves, nBatches);
+      std::vector<int> savedTo = statsData->to_proc;
+      // Replication decisions stage nothing and the application executes
+      // them once the step has resumed, so they ride the last batch only.
+      std::vector<LBAction> savedClones, savedRetires;
+      savedClones.swap(statsData->clones);
+      savedRetires.swap(statsData->retires);
+      lbBatchMsgs.clear();
+      for (int k = 0; k < nBatches; k++) {
+        for (int i = 0; i < (int)statsData->objData.size(); i++)
+          if (savedTo[i] != statsData->from_proc[i] && batchOf[i] != k)
+            statsData->to_proc[i] = statsData->from_proc[i];
+          else
+            statsData->to_proc[i] = savedTo[i];
+        if (k == nBatches - 1) {
+          statsData->clones = savedClones;
+          statsData->retires = savedRetires;
+        }
+        LBMigrateMsg* bm = createMigrateMsg(statsData);
+        bm->lb_batch = k;
+        bm->lb_nbatches = nBatches;
+        LBManagerObj()->get_avail_vector(bm->avail_vector);
+        bm->next_lb = LBManagerObj()->new_lbbalancer();
+        lbBatchMsgs.push_back(bm);
+      }
+      statsData->to_proc = savedTo;
+      delete migrateMsg;
+      migrateMsg = lbBatchMsgs[0];
+      lbNextBatch = 1;
+    }
+  }
+#endif
+
   LBManagerObj()->get_avail_vector(migrateMsg->avail_vector);
   migrateMsg->next_lb = LBManagerObj()->new_lbbalancer();
 
@@ -715,22 +788,7 @@ void CentralLB::ApplyDecision() {
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 
-#if CMK_SCATTER_LB_RESULTS
-  InitiateScatter(migrateMsg);
-#else
-  if (1) {
-      // broadcast
-    thisProxy.ReceiveMigration(migrateMsg);
-  }
-  else {
-    // split the migration for each processor
-    for (int p=0; p<CkNumPes(); p++) {
-      LBMigrateMsg *m = extractMigrateMsg(migrateMsg, p);
-      thisProxy[p].ReceiveMigration(m);
-    }
-    delete migrateMsg;
-  }
-#endif
+  sendDecision(migrateMsg);
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
   statsData->clear();
@@ -741,6 +799,30 @@ void CentralLB::ApplyDecision() {
 void CentralLB::t_LoadBalance()
 {
     LoadBalance();
+}
+
+// Ship one decision message to every PE -- the send tail shared by the
+// normal path and batched release.
+void CentralLB::sendDecision(LBMigrateMsg* migrateMsg)
+{
+#if CMK_SCATTER_LB_RESULTS
+  InitiateScatter(migrateMsg);
+#else
+  thisProxy.ReceiveMigration(migrateMsg);
+#endif
+}
+
+// Reduction target on the decision PE: the previous batch has completed on
+// every PE, so release the next one. The final batch flows into the normal
+// MigrationDone path, which resumes clients.
+void CentralLB::ReleaseNextBatch()
+{
+#if CMK_LBDB_ON
+  if (lbNextBatch >= (int)lbBatchMsgs.size()) return;
+  LBMigrateMsg* m = lbBatchMsgs[lbNextBatch++];
+  if (lbNextBatch >= (int)lbBatchMsgs.size()) lbBatchMsgs.clear();
+  sendDecision(m);
+#endif
 }
 
 void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
@@ -758,13 +840,18 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
     LBScatterMsg(0, middlePe - 1);
   LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
     LBScatterMsg(middlePe, CkNumPes() - 1);
+  leftMsg->lb_batch = rightMsg->lb_batch = msg->lb_batch;
+  leftMsg->lb_nbatches = rightMsg->lb_nbatches = msg->lb_nbatches;
+  leftMsg->totalDecisions = rightMsg->totalDecisions = msg->n_moves;
 
   int *migrateTally = new int[CkNumPes()];
   memset(migrateTally, 0, CkNumPes() * sizeof(int));
 
   for (int i = 0; i < msg->n_moves; i++) {
     MigrateInfo* item = (MigrateInfo*) &msg->moves[i];
-    migrateTally[item->to_pe]++;
+    // Replication decisions are executed by the application and never
+    // arrive through immigrate, so no PE expects them.
+    if (item->isMove()) migrateTally[item->to_pe]++;
     if (item->from_pe < middlePe) {
       leftMsg->moves[leftMsg->numMigrates++] = *item;
     }
@@ -807,6 +894,9 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
         // TODO: multicast without allocating new message each time
         LBScatterMsg *msgCopy = new (numPesInSpan, msg->numMigrates)
           LBScatterMsg(msg->firstPeInSpan, msg->lastPeInSpan);
+        msgCopy->lb_batch = msg->lb_batch;
+        msgCopy->lb_nbatches = msg->lb_nbatches;
+        msgCopy->totalDecisions = msg->totalDecisions;
         msgCopy->numMigrates = msg->numMigrates;
         memcpy(msgCopy->numMigratesPerPe, msg->numMigratesPerPe,
                numPesInSpan * sizeof(int));
@@ -827,6 +917,9 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
       LBScatterMsg *rightMsg =
         new (numPesInRightSpan, leftMsg->numMigrates)
         LBScatterMsg(middlePe, leftMsg->lastPeInSpan);
+      rightMsg->lb_batch = leftMsg->lb_batch;
+      rightMsg->lb_nbatches = leftMsg->lb_nbatches;
+      rightMsg->totalDecisions = leftMsg->totalDecisions;
       leftMsg->numMigrates = 0;
       leftMsg->lastPeInSpan = middlePe - 1;
       for (int i = 0; i < numMigrates; i++) {
@@ -999,12 +1092,28 @@ void CentralLB::ProcessMigrationDecision() {
   LBScatterMsg *m = storedScatterMsg;
   CkAssert(m != NULL);
 
+  lbCurBatch = m->lb_batch;
+  lbCurNBatches = m->lb_nbatches;
   migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
   future_migrates_expected = 0;
+  lbmgr->SetLastRoundDecisions(m->totalDecisions);
 
   for(int i = 0; i < m->numMigrates; i++) {
     MigrateDecision& move = m->moves[i];
     const int me = CkMyPe();
+    if (!move.isMove()) {
+      // A replication decision: handed to the object at once; the
+      // application chooses when to act on it (CkMigratable::ckClone).
+      if (move.fromPe == me) {
+        LDObjHandle h;
+        if (lbmgr->LiveObjHandle(move.dbIndex, move.id, h))
+          executeReplicaDecision(h, move.kind, move.toPe, move.rank);
+        else if (_lb_args.debug() > 0)
+          CkPrintf("[%d] CharmLB> replication decision for object %llu dropped: the object is gone\n",
+                   CkMyPe(), (unsigned long long)move.id);
+      }
+      continue;
+    }
     if (move.fromPe == me) {
       if (move.toPe == me) {
         CkAbort("[%d] Error, attempting to migrate from myself to myself\n",
@@ -1028,6 +1137,31 @@ void CentralLB::ProcessMigrationDecision() {
 #endif
 }
 
+// A Clone / Retire record addressed to this PE (CentralLB.h). The database
+// checks that the handle still names the object the strategy planned for;
+// the object itself decides when to act (CkMigratable::ckClone / ckRetire),
+// so nothing here waits and nothing is counted as an expected arrival.
+void CentralLB::executeReplicaDecision(const LDObjHandle& h, unsigned char kind, int toPe, int rank)
+{
+#if CMK_LBDB_ON
+  int delivered = 0;
+  static const char* const names[] = {"move", "clone", "retire", "clone notice", "retire notice"};
+  const char* name = kind <= LB_DECISION_RETIRE_NOTICE ? names[kind] : "decision";
+  if (kind == LB_DECISION_CLONE) delivered = lbmgr->Clone(h, toPe, rank);
+  else if (kind == LB_DECISION_RETIRE) delivered = lbmgr->Retire(h);
+  else if (kind == LB_DECISION_CLONE_NOTICE) delivered = lbmgr->CloneNotice(h, toPe, rank);
+  else if (kind == LB_DECISION_RETIRE_NOTICE) delivered = lbmgr->RetireNotice(h, rank);
+  if (_lb_args.debug() > 0) {
+    if (!delivered)
+      CkPrintf("[%d] CharmLB> %s of object %llu dropped: the object is gone\n", CkMyPe(), name,
+               (unsigned long long)h.id);
+    else
+      CkPrintf("[%d] CharmLB> %s for object %llu (PE %d, replica %d)\n", CkMyPe(), name,
+               (unsigned long long)h.id, toPe, rank);
+  }
+#endif
+}
+
 void CentralLB::ProcessReceiveMigration()
 {
 #if CMK_LBDB_ON
@@ -1035,16 +1169,26 @@ void CentralLB::ProcessReceiveMigration()
         LBMigrateMsg *m = storedMigrateMsg;
         CmiAssert(m!=NULL);
 
-  if (_lb_args.debug() > 1) 
+  lbCurBatch = m->lb_batch;
+  lbCurNBatches = m->lb_nbatches;
+
+  if (_lb_args.debug() > 1)
     if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
   for (i=0; i<CkNumPes(); i++) lbmgr->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
   migrates_expected = 0;
   future_migrates_expected = 0;
+  lbmgr->SetLastRoundDecisions(m->n_moves);
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
+    if (!move.isMove()) {
+      // A replication decision: handed to the object at once; the
+      // application chooses when to act on it (CkMigratable::ckClone).
+      if (move.from_pe == me) executeReplicaDecision(move.obj, move.kind, move.to_pe, move.rank);
+      continue;
+    }
     const bool iAmSource = (move.from_pe == me && move.to_pe != me);
 #if CMK_GLOBAL_LOCATION_UPDATE
     // Every PE but the one the object is leaving learns the new location here,
@@ -1179,6 +1323,20 @@ void CentralLB::MigrationDoneImpl (int balancing)
 {
 
 #if CMK_LBDB_ON
+  // Batch boundary, not the end of the step: reset the arrival accounting
+  // and signal the decision PE to release the next batch. Clients stay at
+  // the sync barrier; loads, step counters, and callbacks are untouched
+  // until the final batch flows through below.
+  if (lbCurBatch < lbCurNBatches - 1) {
+    migrates_completed = 0;
+    migrates_expected = -1;
+    contribute(CkCallback(CkReductionTarget(CentralLB, ReleaseNextBatch),
+                          thisProxy[cur_ld_balancer]));
+    return;
+  }
+  lbCurBatch = 0;
+  lbCurNBatches = 1;
+
   migrates_completed = 0;
   migrates_expected = -1;
   // clear load stats
@@ -1347,6 +1505,63 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 
   work(stats);
 
+#if CMK_CUDA
+  // Memory contract: every strategy's output passes through the verifier,
+  // memory-aware or not. Moves that would violate a device's headroom are
+  // refused (the object stays home -- always feasible); strategies that plan
+  // with the ledger produce plans that pass untouched.
+  {
+    std::vector<ContractVerifier::Move> cvMoves;
+    for (int i = 0; i < (int)stats->objData.size(); i++) {
+      if (!stats->objData[i].migratable) continue;
+      if (stats->to_proc[i] == stats->from_proc[i]) continue;
+      ContractVerifier::Move m;
+      m.obj = i;
+      m.fromPe = stats->from_proc[i];
+      m.toPe = &stats->to_proc[i];
+      cvMoves.push_back(m);
+    }
+    // A group's copies of one round take consecutive ranks and an application
+    // partitions its work over ranks 0..k-1, so a refusal below leaves only
+    // the contiguous prefix of a group's ranks: a clone whose lower-ranked
+    // sibling the verifier refused is dropped with it.
+    std::vector<std::pair<int, int>> planned;   // (group, rank) of every clone the strategy planned
+    for (const LBAction& c : stats->clones)
+      planned.push_back(std::make_pair(stats->objData[c.obj].replicaGroup, c.rank));
+    ContractVerifier::verifyAndRepair(stats, cvMoves, 0.95, nullptr, &stats->clones);
+    {
+      std::vector<LBAction> kept;
+      for (const LBAction& c : stats->clones) {
+        const int g = stats->objData[c.obj].replicaGroup;
+        bool prefix = true;
+        for (const std::pair<int, int>& pr : planned) {
+          if (pr.first != g || pr.second >= c.rank) continue;
+          bool live = false;
+          for (const LBAction& d : stats->clones)
+            if (stats->objData[d.obj].replicaGroup == g && d.rank == pr.second) live = true;
+          if (!live) prefix = false;
+        }
+        if (prefix) kept.push_back(c);
+        else if (_lb_args.debug() > 0)
+          CkPrintf("CharmLB> copy %d of group %d dropped: a lower-ranked copy of this round was refused\n", c.rank, g);
+      }
+      stats->clones.swap(kept);
+    }
+    // The notices of a clone the verifier refused go with it (a notice names
+    // the clone's rank; the group is the object's).
+    {
+      std::vector<LBAction> kept;
+      for (const LBAction& n : stats->cloneNotices) {
+        const int g = stats->objData[n.obj].replicaGroup;
+        bool live = false;
+        for (const LBAction& c : stats->clones)
+          if (stats->objData[c.obj].replicaGroup == g && c.rank == n.rank) live = true;
+        if (live) kept.push_back(n);
+      }
+      stats->cloneNotices.swap(kept);
+    }
+  }
+#endif
 
   if ((_lb_args.debug()>2) && (CkMyPe() == cur_ld_balancer))  {
     CkPrintf("CharmLB> Obj Map:\n");
@@ -1412,7 +1627,8 @@ void CentralLB::work(LDStats* stats)
   stats->print();
 }
 
-// generate migrate message from stats->from_proc and to_proc
+// generate migrate message from stats->from_proc and to_proc, followed by
+// the strategy's replication decisions (stats->clones / retires)
 LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats)
 {
   int i;
@@ -1431,6 +1647,41 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats)
       migrateMe->async_arrival = objData.asyncArrival;
       migrateInfo.push_back(migrateMe);
     }
+  }
+  for (const LBAction& a : stats->clones) {
+    MigrateInfo *rec = new MigrateInfo;
+    rec->obj = stats->objData[a.obj].handle;
+    rec->from_pe = a.fromPe;
+    rec->to_pe = a.toPe;
+    rec->kind = LB_DECISION_CLONE;
+    rec->rank = a.rank;
+    migrateInfo.push_back(rec);
+  }
+  for (const LBAction& a : stats->retires) {
+    MigrateInfo *rec = new MigrateInfo;
+    rec->obj = stats->objData[a.obj].handle;
+    rec->from_pe = a.fromPe;
+    rec->to_pe = a.fromPe;
+    rec->kind = LB_DECISION_RETIRE;
+    migrateInfo.push_back(rec);
+  }
+  for (const LBAction& a : stats->cloneNotices) {
+    MigrateInfo *rec = new MigrateInfo;
+    rec->obj = stats->objData[a.obj].handle;
+    rec->from_pe = a.fromPe;
+    rec->to_pe = a.toPe;
+    rec->kind = LB_DECISION_CLONE_NOTICE;
+    rec->rank = a.rank;
+    migrateInfo.push_back(rec);
+  }
+  for (const LBAction& a : stats->retireNotices) {
+    MigrateInfo *rec = new MigrateInfo;
+    rec->obj = stats->objData[a.obj].handle;
+    rec->from_pe = a.fromPe;
+    rec->to_pe = a.fromPe;
+    rec->kind = LB_DECISION_RETIRE_NOTICE;
+    rec->rank = a.rank;
+    migrateInfo.push_back(rec);
   }
 
   int migrate_count=migrateInfo.size();
@@ -1651,6 +1902,7 @@ void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count,
  	// update to_proc according to migration msgs
 	for(int i = 0; i < msg->n_moves; i++) {
 	  MigrateInfo &mInfo = msg->moves[i];
+	  if (!mInfo.isMove()) continue;   // a clone or retire changes no assignment
 	  int idx = stats->getHash(mInfo.obj.objID(), mInfo.obj.omID());
 	  CmiAssert(idx != -1);
           stats->to_proc[idx] = mInfo.to_pe;
@@ -1700,6 +1952,7 @@ int CentralLB::useMem() {
 */
 
 CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
+  partition = -1;
   objData.resize(osz);
   commData.resize(csz);
 }
@@ -1710,9 +1963,15 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
+  p|partition;
 #if CMK_CUDA
   p|gpu_device_id;
   p|gpu_total_sms;
+  p|gpu_mem_remaining;
+  p|pool_buff_mem_remaining;
+  p|gpu_pool_arena_bytes;
+  p|gpu_pool_capacity_bytes;
+  p|gpu_ipc_slots;
 #endif
   p|total_walltime;
   p|idletime;

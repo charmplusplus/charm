@@ -20,11 +20,18 @@ public:
 
   void InvokeLB(void);
   void barrierDone(); // Everything is at the PE barrier
+  // Second half of barrierDone: runs once the process's per-object GPU loads
+  // for this round exist (immediately on a non-CUDA build).
+  void gpuLoadsReady();
   void LoadBalance();
   void ResumeClients();
   void ResumeClients(int balancing);
   // Migrated-element callback
   void Migrated(int waitBarrier);
+  // Entry method: another PE's moves (see BroadcastLocationUpdate). With
+  // CMK_GLOBAL_LOCATION_UPDATE off nothing sends it and the body just frees
+  // the message.
+  void ReceiveLocationUpdate(LBMigrateMsg* msg);
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
@@ -40,6 +47,15 @@ public:
     int pe_speed;
     bool available;
     bool move;
+#if CMK_GPU
+    // This PE's device memory, the same five numbers CentralLB's ProcStats
+    // carries (see hapiLBDeviceMemory, hapiLBDevicePoolCapacity).
+    size_t gpu_mem_remaining = 0;
+    size_t pool_buff_mem_remaining = 0;
+    size_t gpu_pool_arena_bytes = 0;
+    size_t gpu_pool_capacity_bytes = 0;
+    int gpu_ipc_slots = 0;
+#endif
 
     std::vector<LDObjData> objData;
     std::vector<LDCommData> commData;
@@ -56,9 +72,26 @@ protected:
   virtual void Strategy(const LDStats* const myStats);
   void ProcessMigrationDecision(LBMigrateMsg* migrateMsg);
   void MigrationDone(int balancing);  // Call when migration is complete
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // Broadcasts this PE's own moves (the only ones it knows about) so every
+  // other PE's location cache stays current for them too. Safe to call with
+  // zero moves; a no-op in that case.
+  void BroadcastLocationUpdate(LBMigrateMsg* migrateMsg);
+  // Same, for a strategy that migrates objects one at a time with
+  // lbmgr->Migrate() instead of handing down a move list; those migrations are
+  // invisible to the call above.
+  void BroadcastSingleLocationUpdate(const LDObjHandle& h, int to_pe);
+#endif
 
   LDStats myStats;
   int migrates_expected;
+
+  // For a strategy that lets another balancer finish its step (DiffusionLB's
+  // scratch-remap hand-off): clears the started flag so the next step is not
+  // refused as already running. Nothing else of the step's bookkeeping is
+  // touched -- the balancer that finishes the step increments the step
+  // counter, clears the loads and resumes the clients.
+  void stepHandedOff() { lb_started = false; }
 
 private:
 	bool lb_started;
