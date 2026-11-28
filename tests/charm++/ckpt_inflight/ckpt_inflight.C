@@ -1,13 +1,14 @@
 // Every element contributes and then calls migrateMe, and the reduction starts
 // a checkpoint at once, while elements are still migrating. A restart checks
-// that all elements came back.
+// that all elements came back with their data, which moves with zero-copy
+// gets between processes.
 // With -direct, every element first moves once by sending itself ckEmigrate,
 // as a program may, and the checkpoint starts after quiescence. Such a move
 // counts no start, so it must not leave the checkpoint waiting forever.
 #include "ckpt_inflight.decl.h"
 
 /* readonly */ CProxy_Main mainProxy;
-static const int numElements = 64;
+static const int numElements = 64, dataSize = 1024;
 
 class Main : public CBase_Main {
   CProxy_E arr;
@@ -52,10 +53,17 @@ public:
 };
 
 class E : public CBase_E {
+  int* data = nullptr;
+
 public:
-  E() {}
+  E() {
+    data = (int*)malloc(dataSize * sizeof(int));
+    for (int i = 0; i < dataSize; i++) data[i] = thisIndex;
+  }
   E(CkMigrateMessage* m) : CBase_E(m) {}
+  void pup(PUP::er& p) { p.pup_buffer(data, dataSize); }
   void hop() {
+    for (int i = 0; i < dataSize; i++) CkEnforce(data[i] == thisIndex);
     int one = 1;
     contribute(sizeof(int), &one, CkReduction::sum_int,
                CkCallback(CkReductionTarget(Main, moved), mainProxy));
