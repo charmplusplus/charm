@@ -48,6 +48,8 @@ class CkLBArgs
                            // particular load ratio
   bool _lb_async;          // AtSyncStart returns without waiting for the step
   bool _lb_asyncFromFlag;  // +LBAsync was on the command line, so CkLBSetAsync changes nothing
+  bool _lb_peerDecision;   // scatter a centralized decision instead of broadcasting it
+  int _lb_scatterThreshold;  // spans of at most this many PEs get a broadcast, not a scatter
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
@@ -83,6 +85,8 @@ class CkLBArgs
     _lb_targetRatio = 1.05;
     _lb_async = false;
     _lb_asyncFromFlag = false;
+    _lb_peerDecision = false;
+    _lb_scatterThreshold = 32;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
@@ -109,6 +113,8 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& lbAsync() { return _lb_async; }
   inline bool& asyncFromFlag() { return _lb_asyncFromFlag; }
+  inline bool& lbPeerDecision() { return _lb_peerDecision; }
+  inline int& scatterThreshold() { return _lb_scatterThreshold; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }

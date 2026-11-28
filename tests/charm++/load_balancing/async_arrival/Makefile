@@ -15,7 +15,9 @@ async_arrival.o: async_arrival.C async_arrival.decl.h
 # Arguments: steps, split (0: AtSync, 1: AtSyncStart/AtSyncWait), wait (the
 # AtSync argument; 0 is an asynchronous arrival). GreedyRefineCentralGPULB is a
 # CentralLB, which counts asynchronous arrivals (TreeLB refuses them), and moves
-# objects without a GPU. DistributedLB ends its steps on the move ledger under
+# objects without a GPU. +LBScatterThreshold 1 makes +LBPeerDecision (which
+# +LBAsync forces) scatter the decision down a tree even at 4 PEs, instead of
+# broadcasting it. DistributedLB ends its steps on the move ledger under
 # +LBSyncResume (which +LBAsync forces) and on arrival counts without it; its
 # gossip ends by quiescence, so under +LBAsync it runs with AtSync, where the
 # elements stop in AtSyncWait and the application goes quiet (an element that
@@ -29,6 +31,8 @@ test: async_arrival
 	$(call run, ./async_arrival 4 1 1 +p4 +LBAsync +balancer GreedyRefineCentralGPULB)
 	$(call run, ./async_arrival 4 1 0 +p4 +LBAsync +balancer GreedyRefineCentralGPULB)
 	$(call run, ./async_arrival 4 0 1 +p4 +LBAsync +balancer GreedyRefineCentralGPULB)
+	$(call run, ./async_arrival 4 0 0 +p4 +LBPeerDecision +LBScatterThreshold 1 +balancer GreedyRefineCentralGPULB)
+	$(call run, ./async_arrival 4 1 1 +p4 +LBAsync +LBScatterThreshold 1 +balancer GreedyRefineCentralGPULB)
 	$(call run, ./async_arrival 4 0 1 +p4 +balancer DistributedLB)
 	$(call run, ./async_arrival 4 0 1 +p4 +LBSyncResume +balancer DistributedLB)
 	$(call run, ./async_arrival 4 0 1 +p4 +LBAsync +balancer DistributedLB)

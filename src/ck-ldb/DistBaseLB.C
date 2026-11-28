@@ -180,7 +180,11 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
         CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
             CkMyPe());
       }
-      lbmgr->Migrate(move.obj,move.to_pe);
+      // Under the ledger a move that cannot be made is simply never recorded;
+      // under arrival counts its destination would wait for it forever.
+      if (lbmgr->Migrate(move.obj,move.to_pe) == 0 && !ledger)
+        CkAbort("[%d] %s: object to move to PE %d is no longer registered\n", me,
+                lbName(), move.to_pe);
     } else if (move.from_pe != me) {
       CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n",
           me,move.from_pe,move.to_pe);

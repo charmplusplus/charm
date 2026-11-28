@@ -389,6 +389,24 @@ void _loadbalancerInit()
       argv, "+LBAsync",
       "AtSyncStart returns immediately; AtSyncWait waits for the step's migrations");
   _lb_args.asyncFromFlag() = _lb_args.lbAsync();
+  _lb_args.lbPeerDecision() = CmiGetArgFlagDesc(
+      argv, "+LBPeerDecision",
+      "Send each PE only the moves of a centralized decision it is the source of, "
+      "instead of broadcasting the whole decision");
+  // Forced under +LBAsync: a location-update broadcast can race a migration
+  // made while the application runs, and a device zerocopy sender reading the
+  // stale entry picks its transfer mode for the process the element just left
+  // -- a MEMCPY chosen that way hands the receiver a pointer into an address
+  // space it cannot read. The price is that a bystander keeps a stale entry
+  // and pays the forwarding hop until the location repair reaches it, so an
+  // application that sends nothing device-to-device can opt out with
+  // CHARM_LB_ASYNC_NO_PEER_DECISION=1.
+  if (_lb_args.lbAsync() && getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL)
+    _lb_args.lbPeerDecision() = true;
+  CmiGetArgIntDesc(argv, "+LBScatterThreshold", &_lb_args.scatterThreshold(),
+                   "With +LBPeerDecision, a span of at most this many PEs gets the "
+                   "decision by broadcast rather than by scatter (default 32)");
+  if (_lb_args.scatterThreshold() < 1) _lb_args.scatterThreshold() = 1;
 
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
@@ -514,6 +532,8 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
   _registerCommandLineOpt("+LBAsync");
+  _registerCommandLineOpt("+LBPeerDecision");
+  _registerCommandLineOpt("+LBScatterThreshold");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
@@ -958,7 +978,11 @@ static void lbApplyAsync(bool on)
 {
   if (_lb_args.asyncFromFlag()) return;  // the command line already decided
   _lb_args.lbAsync() = on;
-  if (on) _lb_args.syncResume() = true;
+  if (on)
+  {
+    _lb_args.syncResume() = true;
+    if (getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL) _lb_args.lbPeerDecision() = true;
+  }
 }
 
 void LBManager::setAsyncMode(bool on) { lbApplyAsync(on); }

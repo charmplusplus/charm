@@ -283,7 +283,11 @@ int LBDatabase::Migrate(LDObjHandle h, int dest)
     CmiAbort("[%d] LBDB::Migrate: Handle %d out of range 0-%zu\n",CkMyPe(),h.handle,objs.size());
   }
   else if (!(objs[h.handle].obj)) {
-    CmiAbort("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%zu\n", CkMyPe(),h.handle,objs.size());
+    // The object died between the statistics the strategy planned from and
+    // this decision. That is legal -- more so under +LBAsync, where elements
+    // keep running through the step -- and the caller tells the destination to
+    // stop expecting it (CentralLB::MissMigrate).
+    return 0;
   }
 
   LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];
