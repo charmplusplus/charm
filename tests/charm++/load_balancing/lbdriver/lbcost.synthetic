@@ -1,0 +1,54 @@
+# Cost table for DiffusionLB (+LBCostConfig), for the lbdriver experiment.
+#
+# THESE NUMBERS ARE SYNTHETIC AND DELIBERATELY NOT IN SECONDS. They did not
+# come from benchmarks/charm++/cuda/gpudirect/lbcalib and they describe no real
+# machine. Anything measuring real placement quality needs a table from lbcalib
+# on the target hardware; treat results obtained with this file as statements
+# about the balancer's decision logic, never about performance.
+#
+# Why the scale is odd. The model compares loadBenefit against
+# migrateCost + commDelta, so only the RATIO between an object's load and its
+# communication decides anything. lbdriver's chares declare ~1 unit of work and
+# exchange 4 KB faces; on real hardware that traffic would price around 1e-4 s,
+# five orders below the declared load, and the model would accept every move by
+# a margin that tells you nothing.
+#
+# The obvious fix -- declare the loads in milliseconds instead -- breaks the
+# experiment elsewhere: MetisLB scales each PE's background time by
+# 256/maxObjLoad (MetisLB.C:263), so shrinking the declared loads makes the
+# runtime's own overhead dominate every object weight, and Metis then correctly
+# starves whichever PE carries the most background. Measured: uniform weights
+# partitioned 0..373 objects per PE instead of 256 each.
+#
+# So the loads stay large enough to dominate background, and these costs are
+# scaled up by 1e4 to sit in the same range. The ratios between tiers, and
+# between communication and migration, are the realistic part; the absolute
+# values are not. A cell's fully-internal traffic prices at ~1.6 units here
+# against a base load of 1.0 and a hot load of 12.0, which is the regime where
+# the model has to actually discriminate.
+
+# Device-to-device memcpy inside one process: ~500 GB/s, ~2 us to launch.
+intra_process_alpha = 2.0e-2
+intra_process_beta  = 2.0e-8
+
+# Two processes sharing a device, through CUDA IPC.
+ipc_same_gpu_alpha = 5.0e-2
+ipc_same_gpu_beta  = 4.0e-8
+
+# Two devices on one host over NVLink: ~25 GB/s.
+ipc_cross_gpu_alpha = 1.0e-1
+ipc_cross_gpu_beta  = 4.0e-7
+
+# Separate hosts over a 100 Gb/s fabric: ~12.5 GB/s.
+inter_node_alpha = 5.0e-2
+inter_node_beta  = 8.0e-7
+
+# One migration: location update, the barrier it joins, pack and unpack, plus
+# per-byte costs for the host and device state it carries.
+migrate_alpha       = 1.0
+migrate_beta_host   = 1.0e-5
+migrate_beta_device = 2.0e-6
+
+# Balancer intervals a placement is assumed to survive, over which the one-off
+# migration cost is amortised.
+placement_lifetime_intervals = 4

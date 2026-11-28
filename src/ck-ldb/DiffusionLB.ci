@@ -1,0 +1,351 @@
+module DiffusionLB
+{
+  readonly int numPes;
+
+  include "CentralLBMsg.h";
+  extern module DistBaseLB;
+  extern module CkMulticast;
+  // The scratch-remap a step can be handed to (+LBDiffusionRemapAbove).
+  extern module MetisLB;
+  initnode void lbinit(void);
+
+  message PseudoRoundMsg;
+
+  group[migratable] DiffusionLB : DistBaseLB
+  {
+    entry void DiffusionLB(const CkLBOptions&);
+    entry[reductiontarget] void statsAssembled();
+
+    // DiffusionNeighbors
+    entry[reductiontarget] void findNBors(int do_again);
+
+    entry[reductiontarget] void print_max_load(double max);
+    entry[reductiontarget] void print_avg_load(double sum);
+    entry[reductiontarget] void print_num_migrations(int sum);
+    entry[reductiontarget] void print_external_comm(double sum);
+    entry[reductiontarget] void print_internal_comm(double sum);
+    
+    // The strategy's phase messages are [expedited]. A regular group message
+    // is re-queued on the receiving PE's scheduler queue behind everything the
+    // application has pending there; an expedited one is handled as soon as
+    // the scheduler pulls it from the network. An application that keeps
+    // running through the step keeps that queue full, and each of the
+    // strategy's ~40 hops was paying a full drain of it: pic2d's pseudo-LB
+    // phase went from 0.3 ms to 64 ms of wall time, leanmd's first-step
+    // neighbour selection to 106 ms. Every handler here is short; the two that build heaps
+    // (AcrossNodeLB, WithinNodeLB) run once per step on one PE per node.
+    entry[expedited] void beginMST();
+    entry[expedited] void startFirstRound();
+    entry[reductiontarget] void findNBorsRound();
+    entry[expedited] void proposeNbor(int nborId);
+    entry[expedited] void askNbor(int nborId, int rnd);
+    entry void update_peload(int rank, double load);
+    entry[expedited] void okayNbor(int agree, int nborId);
+    entry[expedited] void ackNbor(int nbor);
+    // Confirms an ackNbor was processed, so the asker can prove its edge is
+    // symmetric before it reports the round done; see hsMaybeAdvance.
+    entry[expedited] void ackNborDone();
+    entry[expedited] void roundsDone();
+    // The plan's summary from each node to PE 0, and PE 0's verdict to every
+    // PE: execute the plan, or hand the step to the scratch-remap whose group
+    // id travels with the verdict.
+    entry[expedited] void planReport(double load, double predicted, double planIn, double planOut);
+    entry[expedited] void planVerdict(int remap, CkGroupID remapGid);
+    // Which dimension this step diffuses. Every node's rank-0 PE reports its
+    // load totals to PE 0 once its stats are assembled; PE 0 resolves which
+    // dimension binds job-wide (LBLoadDim.h) and tells every PE before the
+    // neighbour phase starts, so all nodes diffuse the same thing.
+    entry[expedited] void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
+                                        double sumDrv, double maxDrv, double period);
+    entry[expedited] void loadDimVerdict(int mode, int launch, double alphaHost, double alphaDev);
+    entry[expedited] void migMsgAck();
+    entry[expedited] void acrossDone();
+    entry[expedited] void nbrAcrossDone();
+    entry[expedited] void nbrWithinDone();
+    entry[expedited] void withinDone();
+
+    entry void ReceiveFinalStats(
+        std::vector<bool> isMigratable, std::vector<int> from_proc,
+        std::vector<int> to_proc, int n_migrateobjs,
+        std::vector<std::vector<LBRealType>> positions, std::vector<double> load,
+        std::vector<LDCommData> commData);
+
+    entry void receiveCentroid(int node, std::vector<LBRealType> centroid, int count);
+    // A node's diffused load for the round, plus the ends of its 1-D key
+    // interval (NaN when it has none) so its neighbours know which side of
+    // themselves it lies on, plus its load in both dimensions as step-time
+    // terms -- host time per PE and device time -- so a sender can tell how
+    // much of the dimension NOT being diffused this node can still take, plus
+    // the device bytes it can take (the memory contract's H_g).
+    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi,
+                                          double hostPerPe, double dev, double memHeadroom);
+    entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
+    // entry void LoadTransfer(double load, int initPE, int objId);
+    entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);
+    entry[expedited] void AcrossNodeLB();
+
+    // (pseudolb_barrier removed -- global convergence check deleted)
+
+    entry[reductiontarget] void startMSTBarrier();
+
+    entry[expedited] void startStrategy();
+    entry[expedited] void startStrategyBarrier();
+    // entry [reductiontarget] void DoneNodeLB();
+    // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
+    entry[expedited] void ProcessMigrations();
+    entry void ProcessFinalStats();
+    entry void CollectStats();
+    entry[expedited] void next_phase(int val);
+    entry[expedited] void LoadMetaInfo(LDObjHandle h, int objId, double load, double gload, int senderPE, int only_mcount, int ackPE, double key);
+    entry void MigrationDoneWrapper();  // Call when migration is complete
+    entry[expedited] void WithinNodeLB();
+  
+    entry void buildMSTinRounds(double best_weight, int best_parent, int best_to);
+    entry void next_MSTphase(double newcost, int newparent, int newto);
+
+    // entry void MigrationInfo(int to, int from);
+    // entry void ResumeClients(CkReductionMsg * msg);
+    // entry void ResumeClients(int balancing);
+
+    entry[expedited] void PseudoLoad(int itr, double load, int node);
+    // Fires on PE 0 once the neighbour handshake has drained (quiescence), which
+    // is what guarantees the neighbour graph is symmetric before the rounds start.
+    entry void beginPseudoRounds();
+    // Seeds the section cookie on each member, then starts its round loop.
+    entry void pseudoRoundStart(PseudoRoundMsg* m);
+    // Reduction result lands here on PE 0, which multicasts the verdict to the
+    // section; members wait for it inside the round loop.
+    entry [reductiontarget] void pseudoVerdictRoot(double maxRatio);
+    // Verdict multicast. This MUST take a CkMcastBaseMsg-derived message: a
+    // CkMulticast-delegated section send stamps the section cookie over the head
+    // of the outgoing message, which silently shreds a marshalled one.
+    entry void pseudoConvergeResult(PseudoRoundMsg* m);
+    // Local hand-off from pseudoConvergeResult into the SDAG round loop.
+    entry[expedited] void pseudoVerdict(double maxRatio);
+    entry[expedited] void pseudoMetricContribute(double metric);
+    // One collective before the rounds: PE 0 counts one load per node and hands
+    // the job-wide mean back to each of them. The decision floor in
+    // diffusionRoundFlows is held against that mean once a node's own
+    // neighbourhood looks flat, which is what lets a plan cross a gradient
+    // whose per-hop slope is under the floor. Same shape as the convergence
+    // check above -- numNodes expedited messages in, numNodes out, once a step.
+    entry[expedited] void pseudoLoadContribute(double load);
+    entry[expedited] void pseudoLoadVerdict(double avgLoad);
+    // pseudoDone / pseudolb_barrier removed with the global convergence check;
+    // see the note in the pseudolb_rounds loop below.
+    // entry void CallResumeClients();
+    // entry void PrintDebugMessage(int len, double result[len]);
+    entry void createCentroidList()
+    {
+      serial
+      {
+        initializeCentroid();
+      }
+
+      for (centReceiveNode = 0; centReceiveNode < numNodes; centReceiveNode++)
+      {
+        when receiveCentroid(int node, std::vector<LBRealType> centroid, int objCount)
+            serial
+        {
+          processReceiveCentroid(node, centroid, objCount);
+        }
+      }
+
+      serial "Sorting nbors"
+      {
+        finishCentroidList();
+      }
+    }
+
+    entry void pseudolb_rounds()
+    {
+      serial
+      {
+        std::string neighborsStr;
+        for (int i = 0; i < neighborCount; i++)
+        {
+          neighborsStr += std::to_string(sendToNeighbors[i]);
+          if (i < neighborCount - 1)
+          {
+            neighborsStr += ", ";
+          }
+        }
+
+        if (_lb_args.debug() > 1) CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
+
+        // The graph this member holds is final: keep it for later steps.
+        hs_graphCached = true;
+
+        // Size the per-neighbour vectors off the list the loops below actually
+        // walk. findNBorsRound latches neighborCount before the last round's
+        // handshake has landed, so the two can disagree by an entry or two.
+        neighborCount = sendToNeighbors.size();
+
+        loadNeighbors.clear();
+        toSendLoad.clear();
+
+        loadNeighbors.resize(neighborCount, 0);
+        toSendLoad.resize(neighborCount, 0);
+        toReceiveLoad.resize(neighborCount, 0);
+        // Momentum starts at zero each LB step: the first round is pure first-order.
+        prevRoundToSend.assign(neighborCount, 0.0);
+        nborKeyLo.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
+        nborKeyHi.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
+        nborHostPerPe.assign(neighborCount, 0.0);
+        nborDev.assign(neighborCount, 0.0);
+        nborMem.assign(neighborCount, std::numeric_limits<double>::max());
+
+        my_pseudo_load = my_load;
+        pseudo_itr = 0;
+        pseudo_converged = false;
+        prev_pseudo_load = my_load;
+        isPseudoRoot = (CkMyPe() == rank0PE);
+        pseudoGlobalAvg = 0.0;
+      }
+
+      // The job-wide mean node load, before the first round plans anything.
+      // Gathered here rather than folded into the per-round convergence check
+      // because the rounds often converge on the first one -- a step whose
+      // plan is entirely zero never changes my_pseudo_load, so the metric is 0
+      // and the loop leaves immediately -- and a mean that only arrived in
+      // round 1 would never be consulted on exactly the steps that need it.
+      serial "Global mean load report"
+      {
+        thisProxy[0].pseudoLoadContribute(isPseudoRoot ? my_load : -1.0);
+      }
+
+      when pseudoLoadVerdict(double avgLoad) serial "Global mean load verdict"
+      {
+        pseudoGlobalAvg = avgLoad;
+      }
+
+      // Rounds stop when diffusion has nothing left worth moving, rather than
+      // always running the fixed bound. The check is a reduction over the
+      // section of diffusing PEs -- one per node -- whose verdict is multicast
+      // back, replacing the O(N) fan-in to PE 0 that the old check used. Only
+      // section members reach this code, so no idle PE is dragged into the
+      // round lockstep.
+      while (pseudo_itr < ITERATIONS && !pseudo_converged)
+      {
+        if (isPseudoRoot)
+        {
+        // Send its load
+        serial "Communicate load info"
+        {
+          for (int i = 0; i < neighborCount; i++)
+          {
+            thisProxy[sendToNeighbors[i] * nodeSize].ReceiveLoadInfo(
+                pseudo_itr, my_pseudo_load, myNodeId,
+                keyed1D ? myKeyLo : std::numeric_limits<double>::quiet_NaN(),
+                keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN(),
+                nodeHostSum / nodeSize, nodeGroupSum(), myMemHeadroom);
+          }
+        }
+
+        // Wait for all its neighbors load
+        for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
+        {
+          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node, double keyLo, double keyHi,
+                                           double hostPerPe, double dev, double memHeadroom) serial
+          {
+            int pos = findNborIdx(node);
+            if (pos < 0)
+              CkPrintf("[DiffusionLB] ERROR: node %d got round-%d load from non-neighbour "
+                       "node %d -- neighbour graph is asymmetric\n", myNodeId, itr, node);
+            else
+            {
+              loadNeighbors[pos] = load;
+              nborKeyLo[pos] = keyLo;
+              nborKeyHi[pos] = keyHi;
+              nborHostPerPe[pos] = hostPerPe;
+              nborDev[pos] = dev;
+              nborMem[pos] = memHeadroom;
+            }
+          }
+        }
+
+        // Calculate average and do pseudo load balancing
+        serial "Pseudo LB"
+        {
+          // avgLoadNeighbor = avgNborLoad();
+          PseudoLoadBalancing();
+        }
+
+        for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
+        {
+          when PseudoLoad[pseudo_itr](int itr, double load, int node) serial
+          {
+            my_pseudo_load += load;
+            int pos = findNborIdx(node);
+            if (pos < 0)
+              CkPrintf("[DiffusionLB] ERROR: node %d got round-%d transfer from non-neighbour "
+                       "node %d -- neighbour graph is asymmetric\n", myNodeId, itr, node);
+            else
+              toSendLoad[pos] -= load;
+          }
+        }
+
+        }  // end if (isPseudoRoot)
+
+        // Global convergence check, restored as a reduction. Each node reports
+        // the largest share of its own load it still wants to shift; the max
+        // across the group decides, and the verdict is broadcast to everyone.
+        // Nodes converge on the first round or two here -- diffusion typically
+        // wants to move ~1% -- so this replaces most of the fixed round count
+        // with two collectives.
+        serial "Convergence contribute"
+        {
+          pseudo_metric = 0.0;
+          if (isPseudoRoot)
+          {
+            // Converged means the diffused loads have stopped moving, not that
+            // this round proposed no transfers: PseudoLoadBalancing recomputes
+            // the transfers from the current load differences every round, so
+            // the residual never decays to zero even at equilibrium. What does
+            // settle is my_pseudo_load itself.
+            const double denom = (my_load > 1e-12) ? my_load : 1e-12;
+            pseudo_metric = fabs(my_pseudo_load - prev_pseudo_load) / denom;
+            prev_pseudo_load = my_pseudo_load;
+          }
+          // Counted on PE 0, which sends the same verdict back to every
+          // member so they all leave the loop on the same round. Expedited
+          // point-to-point in both directions: the section reduction and
+          // verdict multicast this replaces travel as ordinary messages and
+          // wait behind the application's queued work on every hop.
+          thisProxy[0].pseudoMetricContribute(pseudo_metric);
+        }
+
+        when pseudoVerdict(double maxRatio) serial "Convergence verdict"
+        {
+          pseudo_converged = (maxRatio <= PSEUDO_CONVERGE_RATIO);
+          pseudo_itr++;
+          if (isPseudoRoot && myNodeId == 0 && (pseudo_converged || pseudo_itr == ITERATIONS)
+              && _lb_args.debug() >= 1)
+            CkPrintf("[DiffusionLB] pseudo rounds run: %d (converged=%d, max ratio %g)\n",
+                     pseudo_itr, (int)pseudo_converged, maxRatio);
+        }
+      }
+
+      // Calculate the aggregate load that has to be sent.
+      serial "Aggregate load"
+      {
+        if (!isPseudoRoot) return;
+        endPseudoLBTiming();
+        startAcrossTiming();
+        if (_lb_args.debug() > 1) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
+                 my_load, my_pseudo_load);
+        loadReceivers = 0;
+        // Leaving the loop is the whole condition AcrossNodeLB needs: the
+        // convergence verdict cannot have been issued while any round message
+        // was unprocessed, so nothing of the rounds is in flight. That holds
+        // for this member alone, so it starts its across-node phase directly;
+        // a LoadMetaInfo it sends can only reach a node that has also left the
+        // rounds, and nothing that handler touches depends on that node having
+        // started its own phase. The PE 0 count is kept as an opt-in. With
+        // +LBDiffusionRemapAbove the plan is first reported to PE 0, which
+        // decides whether it is worth executing at all (proceedAfterPlan).
+        proceedAfterPlan();
+      }
+    }
+  };
+};

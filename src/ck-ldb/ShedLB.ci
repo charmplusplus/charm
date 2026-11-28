@@ -1,0 +1,8 @@
+module ShedLB {
+
+  extern module CentralLB;
+  initnode void lbinit(void);
+  group [migratable] ShedLB : CentralLB {
+    entry void ShedLB(const CkLBOptions &);
+  };
+};

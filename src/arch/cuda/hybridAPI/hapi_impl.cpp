@@ -2943,3 +2943,23 @@ int hapiMyDeviceTotalSMs() {
   return dm.multi_processor_count;
 }
 
+size_t hapiLBDevicePoolCapacity() { return 0; }
+
+void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
+                        int* ipcSlots) {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  size_t freeMem = 0, totalMem = 0;
+  hapiCheck(hapiMemGetInfo(&freeMem, &totalMem));
+  *devFree = freeMem;
+  *arenaBytes = 0;
+  *poolFree = 0;
+  *ipcSlots = 0;
+  if (csv_gpu_manager.use_shm) {
+    auto it = csv_gpu_manager.device_map.find(CmiMyPe());
+    if (it != csv_gpu_manager.device_map.end() && it->second != nullptr)
+      *poolFree = it->second->get_lb_buffer_free_size();
+    const int slice = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
+    *ipcSlots = slice >= 4 ? slice * 3 / 4 : (slice > 0 ? 1 : 0);
+  }
+}
+

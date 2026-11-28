@@ -24,6 +24,18 @@ CkGroupID _lbmgr;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
+// The per-object device footprint slot the memory contract reads, as a plain
+// global: every PE registers the layout in the same order, so the value is
+// identical on all of them, and a strategy helper thread has no Ckpv to read.
+// -1 while no footprint producer has registered one; the contract then prices
+// every object at its serialized device size (LBMemoryModel::footprint).
+static std::atomic<int> _lb_obj_index_any{-1};
+int lbObjFootprintSlot() { return _lb_obj_index_any.load(std::memory_order_relaxed); }
+void lbSetObjFootprintSlot(int slot) { _lb_obj_index_any.store(slot, std::memory_order_relaxed); }
+// Which load the group dimension carries this step (LBLoadDim.h): 0 device
+// time, 1 driver time. Process-wide; set by the resolvers on the deciding PE
+// and by DiffusionLB's verdict on every PE.
+int _lb_groupDimLaunch = 0;
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
@@ -172,6 +184,22 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
       createLoadBalancer(balancer);
     }
   }
+  else
+  {
+    // No balancer named anywhere: the strategy the GPU applications measured
+    // best, when its parts are linked in. MetisLB partitions once (its priced
+    // decision applies the mapping only when the step bound falls), then
+    // DiffusionLB refines at every later step. An application that wants
+    // something else names it with +balancer.
+    const bool haveMetis = lbRegistry.search("MetisLB") != NULL;
+    const bool haveDiffusion = lbRegistry.search("DiffusionLB") != NULL;
+    if (haveMetis) createLoadBalancer("MetisLB");
+    if (haveDiffusion) createLoadBalancer("DiffusionLB");
+    if (CkMyPe() == 0 && (haveMetis || haveDiffusion))
+      CkPrintf("CharmLB> default strategy: %s%s%s (no +balancer given)\n",
+               haveMetis ? "MetisLB once" : "", haveMetis && haveDiffusion ? ", then " : "",
+               haveDiffusion ? "DiffusionLB at every later step" : "");
+  }
 
   // simulation mode
   if (LBSimulation::doSimulation)
@@ -216,6 +244,8 @@ void _loadbalancerInit()
       lbNames.push_back("RefineA");
       lbNames.push_back("Hybrid");
       lbNames.push_back("MetisLB");
+      lbNames.push_back("GreedyCentralLB");
+      lbNames.push_back("GreedyRefineCentralLB");
       if (CkMyPe() == 0)
       {
         if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
@@ -418,6 +448,40 @@ void _loadbalancerInit()
   if(CkMyPe()==0 && lbcommOff)
     CmiPrintf("Warning: Ignoring the deprecated +LBCommOff option as communication is off by default.\n");
 
+  // DiffusionLB tuning. The communication-aware object metric is the default;
+  // the centroid metric needs application-registered positions
+  // (CkMigratable::setObjPosition) and is opt-in.
+  CmiGetArgFlagDesc(argv, "+LBDiffusionCommOn",
+                    "(default) DiffusionLB uses the communication graph to pick objects");
+  _lb_args.diffusionCommOn() = !CmiGetArgFlagDesc(
+      argv, "+LBDiffusionCentroid", "DiffusionLB picks objects by centroid distance instead");
+  _lb_args.noMST() =
+      CmiGetArgFlagDesc(argv, "+LBnoMST", "DiffusionLB skips MST neighbor construction");
+  CmiGetArgIntDesc(argv, "+LBDiffusionNumNbors", &_lb_args.diffusionNumNbors(),
+                   "DiffusionLB number of diffusion neighbors");
+  CmiGetArgDoubleDesc(argv, "+LBDiffusionBeta", &_lb_args.diffusionBeta(),
+                      "DiffusionLB second-order momentum, in [1,2). 1.0 disables it");
+  _lb_args.diffusionGpuDim() = CmiGetArgFlagDesc(
+      argv, "+LBDiffusionGpuDim",
+      "Balance device occupancy across nodes/GPU groups (default: whichever dimension binds)");
+  _lb_args.diffusionHostDim() = CmiGetArgFlagDesc(
+      argv, "+LBDiffusionHostDim",
+      "Balance host time across nodes/GPU groups (default: whichever dimension binds)");
+  CmiGetArgDoubleDesc(argv, "+LBDiffusionMinImbalance", &_lb_args.diffusionMinImbalance(),
+                      "DiffusionLB leaves an imbalance below this fraction of the mean alone (default 0.10)");
+  CmiGetArgDoubleDesc(argv, "+LBDiffusionMaxMoveFrac", &_lb_args.diffusionMaxMoveFrac(),
+                      "DiffusionLB moves at most this fraction of a node's migratable load across nodes per step (default 1.0: no cap)");
+  CmiGetArgDoubleDesc(argv, "+LBShedEps", &_lb_args.shedEps(),
+                      "ShedLB: allowed excess over the mean load, as a fraction");
+  CmiGetArgDoubleDesc(argv, "+LBLoadVectorAbove", &_lb_args.loadVectorAbove(),
+                      "Balance both load dimensions (host time and device occupancy) when neither "
+                      "has slack below this fraction of the binding one (default 0.5; >1 never)");
+  // Transfer-cost table. With it, DiffusionLB weighs each across-node move
+  // against what the move costs; without it, every move the diffusion quota
+  // asks for is made.
+  CmiGetArgStringDesc(argv, "+LBCostConfig", (char**)&_lb_args.costConfig(),
+                      "Path to the DiffusionLB transfer-cost table");
+
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
   _lb_args.beta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
@@ -502,6 +566,18 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBOff");
   _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
+  _registerCommandLineOpt("+LBDiffusionCommOn");
+  _registerCommandLineOpt("+LBDiffusionCentroid");
+  _registerCommandLineOpt("+LBnoMST");
+  _registerCommandLineOpt("+LBDiffusionNumNbors");
+  _registerCommandLineOpt("+LBDiffusionBeta");
+  _registerCommandLineOpt("+LBDiffusionGpuDim");
+  _registerCommandLineOpt("+LBDiffusionHostDim");
+  _registerCommandLineOpt("+LBDiffusionMinImbalance");
+  _registerCommandLineOpt("+LBDiffusionMaxMoveFrac");
+  _registerCommandLineOpt("+LBShedEps");
+  _registerCommandLineOpt("+LBLoadVectorAbove");
+  _registerCommandLineOpt("+LBCostConfig");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
@@ -541,6 +617,7 @@ void LBManager::setTimer()
 void LBManager::init(void)
 {
   mystep = 0;
+  lbEventsDone = 0;
   new_ld_balancer = 0;
   chare_count = 0;
   metabalancer = nullptr;
@@ -848,7 +925,10 @@ void LBManager::nextLoadbalancer(int seq)
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  if (lbNames[switchTo] != "DistributedLB" &&
+      lbNames[switchTo] != "MetisLB" &&
+      lbNames[switchTo] != "GreedyCentralLB" &&
+      lbNames[switchTo] != "GreedyRefineCentralLB")
   {
     json config;
     if (lbNames[switchTo] == "Hybrid")
@@ -974,6 +1054,25 @@ void LBManager::ResetAdaptive()
 
 void LBManager::ResumeClients()
 {
+  // One balancing event has ended on this PE. In the default chain (MetisLB
+  // first, DiffusionLB after) the partitioner is asked again every fourth
+  // event: priced, it moves nothing on a balanced run and catches the drift
+  // local moves do not follow. DiffusionLB never calls nextLoadbalancer, so
+  // the switch is made here, on every PE alike.
+  if (loadbalancers.size() == 2 && loadbalancers[0] != NULL && loadbalancers[1] != NULL &&
+      strcmp(loadbalancers[0]->lbName(), "MetisLB") == 0)
+  {
+    lbEventsDone++;
+    const int want = (lbEventsDone % 4 == 0) ? 0 : 1;
+    if (want != currentLBIndex)
+    {
+      loadbalancers[currentLBIndex]->turnOff();
+      currentLBIndex = want;
+      loadbalancers[currentLBIndex]->turnOn();
+      if (CkMyPe() == 0 && want == 0)
+        CmiPrintf("CharmLB> event %d: MetisLB re-evaluates at the next step\n", lbEventsDone);
+    }
+  }
 #if CMK_LBDB_ON
   if (_lb_args.metaLbOn())
   {

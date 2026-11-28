@@ -7,7 +7,17 @@
 #include "DistBaseLB.h"
 #include "DistBaseLB.def.h"
 
+#if CMK_CUDA
+#include "hapi.h"
+#include "gpumanager.h"
+CsvExtern(GPUManager, gpu_manager);
+#endif
+
 #define  DEBUGF(x)      // CmiPrintf x;
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+extern void UpdateLocation(MigrateInfo& migData);
+#endif
 
 void DistBaseLB::barrierDone() {
 #if CMK_LBDB_ON
@@ -31,6 +41,36 @@ void DistBaseLB::barrierDone() {
     }
   }
 
+#if CMK_CUDA
+  // Turn the CUPTI kernel timeline into a per-object GPU load before
+  // AssembleStats copies object data out of the LB database, as
+  // CentralLB::InvokeLB does; without it LDObjData::gpuTime is zero for every
+  // distributed strategy, and a device-bound application's load is invisible
+  // because the host only enqueues kernels.
+  //
+  // Built by the LAST PE of the process to get here, not the first: this
+  // barrier fires when this PE's own objects are at AtSync, but the records
+  // are shared by the whole process, and a drain by the first arrival drops
+  // every kernel the other PEs' objects were still finishing. The earlier
+  // arrivals continue from gpuLoadsReady.
+  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  hapiPrepareCuptiLoads();
+  const int first = CkNodeFirst(CkMyNode());
+  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+    thisProxy[first + r].gpuLoadsReady();
+#else
+  gpuLoadsReady();
+#endif
+#endif
+}
+
+// The round's GPU loads exist (or there are none to build): copy this PE's
+// share out, assemble its stats and start the strategy.
+void DistBaseLB::gpuLoadsReady() {
+#if CMK_LBDB_ON
+#if CMK_CUDA
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+#endif
   AssembleStats();
   thisProxy[CkMyPe()].LoadBalance();
 #endif
@@ -90,7 +130,13 @@ void DistBaseLB::AssembleStats() {
 #endif
   lbmgr->IdleTime(&myStats.idletime);
 
-  myStats.move = true; 
+  myStats.move = true;
+
+#if CMK_CUDA
+  hapiLBDeviceMemory(&myStats.gpu_mem_remaining, &myStats.pool_buff_mem_remaining,
+                     &myStats.gpu_pool_arena_bytes, &myStats.gpu_ipc_slots);
+  myStats.gpu_pool_capacity_bytes = hapiLBDevicePoolCapacity();
+#endif
 
   myStats.objData.clear();
   myStats.objData.resize(lbmgr->GetObjDataSz());
@@ -161,6 +207,10 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
     }
   }
 
+#if CMK_GLOBAL_LOCATION_UPDATE
+  BroadcastLocationUpdate(migrateMsg);
+#endif
+
   if (CkMyPe() == 0) {
     double strat_end_time = CkWallTimer();
     if (_lb_args.debug())
@@ -168,11 +218,60 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
           strat_end_time - strat_start_time, CmiMemoryUsage()/(1024.0*1024.0));
   }
 
+  // The message is this function's to free: its callers build it, hand it
+  // over and forget it, and BroadcastLocationUpdate above copies rather than
+  // keeping it. Freed before MigrationDone, which can run the whole tail of
+  // the step.
+  delete migrateMsg;
+
   // If all the expected objs have migrated in, then migration is done
   if (migrates_expected == migrates_completed && lb_started) {
     MigrationDone(1);
   }
 #endif
+}
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+// Each PE only knows the moves it is the source of -- there is no global move
+// list to hand a bystander PE the way CentralLB::ReceiveMigration does. So the
+// source broadcasts its own moves, and every PE that is neither the source nor
+// the destination of a given move (the migration mechanics already update
+// those two directly) refreshes its cache for it.
+void DistBaseLB::BroadcastLocationUpdate(LBMigrateMsg* migrateMsg) {
+  if (migrateMsg->n_moves == 0) return;
+  void* copy = CkCopyMsg((void**)&migrateMsg);
+  thisProxy.ReceiveLocationUpdate((LBMigrateMsg*)copy);
+}
+
+// Same purpose as BroadcastLocationUpdate, for a strategy that migrates objects
+// one at a time with lbmgr->Migrate() instead of handing down a move list.
+// Those migrations are invisible to the list-based broadcast above, so without
+// this every PE keeps a stale cached location for the moved object.
+void DistBaseLB::BroadcastSingleLocationUpdate(const LDObjHandle& h, int to_pe) {
+  LBMigrateMsg* msg = new(1, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
+  msg->n_moves = 1;
+  msg->moves[0].index = 0;
+  msg->moves[0].obj = h;
+  msg->moves[0].from_pe = CkMyPe();
+  msg->moves[0].to_pe = to_pe;
+  msg->moves[0].async_arrival = 0;
+  msg->moves[0].kind = LB_DECISION_MOVE;
+  msg->moves[0].rank = 0;
+  thisProxy.ReceiveLocationUpdate(msg);
+}
+#endif
+
+void DistBaseLB::ReceiveLocationUpdate(LBMigrateMsg* msg) {
+#if CMK_GLOBAL_LOCATION_UPDATE
+  const int me = CkMyPe();
+  for (int i = 0; i < msg->n_moves; i++) {
+    MigrateInfo& move = msg->moves[i];
+    if (move.from_pe != me && move.to_pe != me) {
+      UpdateLocation(move);
+    }
+  }
+#endif
+  delete msg;
 }
 
 void DistBaseLB::MigrationDone(int balancing) {

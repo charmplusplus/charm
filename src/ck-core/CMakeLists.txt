@@ -4,6 +4,7 @@ set(ck-cxx-sources
     ../ck-ldb/BaseLB.C ../ck-ldb/CentralLB.C
     ../ck-ldb/CentralPredictor.C ../ck-ldb/ckgraph.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
+    ../ck-ldb/DiffusionCostModel.C
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
@@ -55,13 +56,15 @@ set(ldb-cxx-sources
 
 
 set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
+    ../ck-ldb/DiffusionCostModel.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/GreedyRefineCentralGPULB.h
     ../ck-ldb/LBComm.h
-    ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
+    ../ck-ldb/LBDatabase.h ../ck-ldb/LBLoadDim.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h
+    ../ck-ldb/LBMemoryContract.h ../ck-ldb/LBMigrateWindow.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
-    ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
+    ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.h
     ../ck-ldb/RandomForestModel.h
     ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
@@ -84,8 +87,8 @@ add_dependencies(ckmain ck)
 # CommonLBs used to be a subset of EveryLB, but they were unified as
 # part of the LB refactor. However, maintain both targets for
 # backwards compatibility and for possible future divergence.
-add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
-add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
 configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleCommonLBs ck ckmetis)
@@ -109,8 +112,33 @@ add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
 add_dependencies(moduleRecBipartLB ck)
+# DiffusionLB is a single translation unit: DiffusionLB.C #includes DiffusionHelper.C,
+# DiffusionMetric.C, DiffusionNeighbors.C, DiffusionPseudo.C and DiffusionCore.C, so
+# only DiffusionLB.C is compiled. The rest are listed for dependency tracking.
+add_library(moduleDiffusionLB ../ck-ldb/DiffusionLB.C ../ck-ldb/DiffusionLB.h
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C ../ck-ldb/DiffusionJSON.h
+  ../ck-ldb/DiffusionLoad.h ../ck-ldb/DiffusionMetric.h ../ck-ldb/DiffusionFlow.h
+  ../ck-ldb/DiffusionSelect.h ../ck-ldb/DiffusionCostModel.h)
+set_source_files_properties(
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C
+  PROPERTIES HEADER_FILE_ONLY TRUE)
+# DiffusionLB can hand a step to a scratch-remap (+LBDiffusionRemapAbove), which
+# it runs on a MetisLB it creates itself; so it links the CommonLBs module (which
+# carries MetisLB together with the ckgraph classes it needs) and METIS. Link
+# -module DiffusionLB alone, not together with -module EveryLB, which carries a
+# second copy of the same objects.
+add_dependencies(moduleDiffusionLB ck moduleCommonLBs)
+configure_file(../ck-ldb/libmoduleDiffusionLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_library(moduleGreedyRefineCentralGPULB ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
 add_dependencies(moduleGreedyRefineCentralGPULB ck)
+add_library(moduleGreedyCentralLB ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
+add_dependencies(moduleGreedyCentralLB ck)
+add_library(moduleGreedyRefineCentralLB ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h)
+add_dependencies(moduleGreedyRefineCentralLB ck)
+add_library(moduleShedLB ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
+add_dependencies(moduleShedLB ck)
 add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)
 configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleScotchLB ck)

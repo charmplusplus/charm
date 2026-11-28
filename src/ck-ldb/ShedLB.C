@@ -1,0 +1,742 @@
+/**
+ * \addtogroup CkLdb
+*/
+/*@{*/
+
+/**
+ * ShedLB: threshold refinement minimising migrated bytes. See ShedLB.h for
+ * what it guarantees and why it is not another repacking strategy.
+*/
+
+#include "charm++.h"
+#include "ShedLB.h"
+#include "DiffusionCostModel.h"
+#if CMK_GPU
+#include "LBMemoryContract.h"
+#endif
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <map>
+#include <unordered_map>
+#include <vector>
+
+extern int quietModeRequested;
+
+CreateLBFunc_Def(ShedLB, "Threshold refinement that minimises migrated bytes")
+
+ShedLB::ShedLB(const CkLBOptions& opt) : CBase_ShedLB(opt)
+{
+  lbname = "ShedLB";
+  if ((CkMyPe() == 0) && !quietModeRequested)
+    CkPrintf("CharmLB> ShedLB created.\n");
+}
+
+ShedLB::ShedLB(CkMigrateMessage* m) : CBase_ShedLB(m) { lbname = "ShedLB"; }
+
+namespace
+{
+// What one migration of this object stages. Unknown sizes fall back to 1, so
+// the objective degenerates to minimising the NUMBER of moves rather than
+// silently treating every object as free.
+inline double objBytes(const LDObjData& od)
+{
+#if CMK_GPU
+  const double b = (double)od.gpuPupSize;
+  return b > 0.0 ? b : 1.0;
+#else
+  (void)od;
+  return 1.0;
+#endif
+}
+}  // namespace
+
+void ShedLB::work(LDStats* stats)
+{
+  const int n_pes = stats->nprocs();
+  const int n_objs = (int)stats->objData.size();
+  if (n_pes <= 0 || n_objs <= 0) return;
+
+  // ---- which resource is being balanced --------------------------------
+  // Device time when there is any, because a migratable object's cost is
+  // then its kernels and the PEs sharing a GPU are one bin. Otherwise host
+  // time, one bin per PE.
+  bool useGpu = false;
+#if CMK_GPU
+  {
+    double gpuTotal = 0.0;
+    for (int i = 0; i < n_objs; i++)
+      if (stats->objData[i].migratable) gpuTotal += stats->objData[i].gpuTime;
+    useGpu = gpuTotal > 0.0;
+  }
+#endif
+
+  // ---- bins ------------------------------------------------------------
+  std::vector<Bin> bins;
+  std::vector<int> peToBin(n_pes, -1);
+  {
+    std::unordered_map<uint64_t, int> devToBin;
+    for (int pe = 0; pe < n_pes; pe++)
+    {
+      if (!stats->procs[pe].available) continue;
+      int b;
+      if (useGpu)
+      {
+#if CMK_GPU
+        const uint64_t dev = stats->procs[pe].gpu_device_id;
+        auto it = devToBin.find(dev);
+        if (it == devToBin.end()) { b = (int)bins.size(); devToBin[dev] = b; bins.push_back(Bin()); }
+        else b = it->second;
+#else
+        b = (int)bins.size(); bins.push_back(Bin());
+#endif
+      }
+      else
+      {
+        b = (int)bins.size();
+        bins.push_back(Bin());
+      }
+      peToBin[pe] = b;
+      bins[b].pes.push_back(pe);
+    }
+  }
+  const int nbins = (int)bins.size();
+  if (nbins <= 1) return;   // nothing to balance across
+
+  // ---- loads, and the candidates each bin could shed -------------------
+  // Non-migratable objects are background: they count toward a bin's load and
+  // can never be shed, which is what keeps the threshold honest.
+  std::vector<double> peCpu(n_pes, 0.0);
+  std::vector<Cand> cands;
+  cands.reserve(n_objs);
+  double total = 0.0;
+  for (int i = 0; i < n_objs; i++)
+  {
+    const LDObjData& od = stats->objData[i];
+    const int pe = stats->from_proc[i];
+    if (pe < 0 || pe >= n_pes || peToBin[pe] < 0) continue;
+    const int b = peToBin[pe];
+#if CMK_GPU
+    const double load = useGpu ? od.gpuTime : od.wallTime;
+#else
+    const double load = od.wallTime;
+#endif
+    bins[b].load += load;
+    total += load;
+    peCpu[pe] += od.wallTime;
+    if (od.migratable) cands.push_back(Cand{i, load, objBytes(od), b});
+  }
+  if (total <= 0.0) return;
+
+  const double avg = total / nbins;
+  double eps = _lb_args.shedEps();
+  if (eps < 0.0) eps = 0.0;
+  const double T = avg * (1.0 + eps);
+  // The host is a second resource. An object's entry-method time runs on its
+  // PE's host whatever its device load is (an expert's chunk launches and
+  // output puts: 0.5 to 2.4 ms a step on the A100 nodes), and a PE's step is
+  // bound by the larger of its device load and its host time. Packing ten
+  // experts on one PE by device load alone gave it 10 ms of host time a
+  // step and the serving step (job 23612682). So when the bins are on
+  // device time, no move or copy may raise a host above the device target,
+  // or above the hosts' own mean with the same slack where that is higher.
+  // On host time the bins' loads are the host times and T bounds them; a
+  // second cap there would refuse every copy of an object above T, since a
+  // copy's share lands on a PE that already carries its own load.
+  double hostMean = 0.0;
+  {
+    int np = 0;
+    for (int pe = 0; pe < n_pes; pe++)
+      if (stats->procs[pe].available && peToBin[pe] >= 0) { hostMean += peCpu[pe]; np++; }
+    if (np > 0) hostMean /= np;
+  }
+  const double hostCap = useGpu ? std::max(T, hostMean * (1.0 + eps))
+                                : std::numeric_limits<double>::max();
+  int hostRefusals = 0;
+
+  double maxLoad = 0.0;
+  for (int b = 0; b < nbins; b++) maxLoad = std::max(maxLoad, bins[b].load);
+
+  // Memory is a constraint here, not the objective: the bytes a move stages
+  // are still what shedding minimises, and a destination is only a candidate
+  // if it can hold what the object holds (the memory contract's I-final). The
+  // two differ under the device pool -- a Compute stages its live prefix but
+  // holds its capacity. Staging and IPC slots are the batch planner's.
+#if CMK_GPU
+  LBMemoryModel memModel;
+  memModel.build(stats);
+  MemoryLedger ledger;
+  ledger.init(&memModel, 0.95, /*waveStaging=*/false);
+  int memRefusals = 0;
+#endif
+  // Where an object placed in each bin would go: its least host-loaded PE.
+  auto landingPe = [&](int b) {
+    int dstPe = bins[b].pes[0];
+    for (int pe : bins[b].pes)
+      if (peCpu[pe] < peCpu[dstPe]) dstPe = pe;
+    return dstPe;
+  };
+  std::vector<int> binPe(nbins);
+  for (int b = 0; b < nbins; b++) binPe[b] = landingPe(b);
+
+  // ---- multiplicity: replicable groups -------------------------------
+  // An object above T cannot be placed anywhere, so for objects the
+  // application declared replicable (LDObjData::replicaGroup) the balancer
+  // changes how many copies exist before it places anything. A group's load
+  // L_g is the sum over its copies; it needs k = ceil(L_g / T) copies, each
+  // carrying L_g / k, up to the application's maximum. Copies are added one
+  // at a time until the group has what it needs or a copy would not lower
+  // the critical path, and one is taken back per step, the latter only when the remaining
+  // copies would sit below the mean (T (1 - eps) ~ avg), so the two decisions
+  // do not alternate on a load that hovers around T. A copy costs the
+  // object's bytes at its destination like a move; nothing is staged for a
+  // retirement and the bytes it frees are not spent in the same step.
+  // Members of a group never share a bin; the source of a copy and a retiring
+  // copy are left out of the shedding below.
+  std::vector<char> pinned(cands.size(), 0);
+  std::unordered_map<int, std::vector<int>> groupMembers;   // group -> cand indices
+  for (size_t k = 0; k < cands.size(); k++)
+  {
+    const LDObjData& od = stats->objData[cands[k].idx];
+    if (od.replicable()) groupMembers[od.replicaGroup].push_back((int)k);
+  }
+  auto groupHoldsBin = [&](int g, int b) {
+    auto it = groupMembers.find(g);
+    if (it == groupMembers.end()) return false;
+    for (int k : it->second)
+      if (cands[k].bin == b) return true;
+    return false;
+  };
+  int clonesPlanned = 0, retiresPlanned = 0;
+  static DiffusionCostConfig costCfg;
+  static bool costCfgTried = false;
+  if (!costCfgTried && !groupMembers.empty())
+  {
+    costCfgTried = true;
+    costCfg.loadDefault(_lb_args.costConfig());
+  }
+  for (auto& gm : groupMembers)
+  {
+    const int g = gm.first;
+    std::vector<int>& members = gm.second;
+    double L = 0.0;
+    int maxCount = 1;
+    for (int k : members)
+    {
+      L += cands[k].load;
+      maxCount = std::max(maxCount, stats->objData[cands[k].idx].replicaMax);
+    }
+    const int count = (int)members.size();
+    if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+      for (int k : members)
+        CkPrintf("[ShedLB] group %d: copy %d of %d on PE %d, load %.4f (max %d)\n", g,
+                 stats->objData[cands[k].idx].replicaRank, count, stats->from_proc[cands[k].idx],
+                 cands[k].load, maxCount);
+    if (L <= 0.0) continue;
+    int want = (int)std::ceil(L / T);
+    if (want < 1) want = 1;
+    if (want > maxCount) want = maxCount;
+
+    // The recurring cost of a copy, as the application declared it: what
+    // one exchange with one peer adds to a copy per balancing interval, on
+    // the same host or across hosts (the physical node: a Charm++ node is a
+    // process). The measured loads leave it out, so each copy's exchanges
+    // with the others are counted into its bin here.
+    const LDObjData& odg = stats->objData[cands[members[0]].idx];
+    auto memberPe = [&](int k) { return binPe[cands[k].bin]; };   // the bin's PE: right for a copy planned this round too
+    // What one peer costs a copy in a group of `fan`: what the copy measured,
+    // when it has exchanged (replicaCostNode / replicaCostRemote), else the
+    // calibrated transfer-cost table's figure for the declared bytes and
+    // messages at that fan (lbcalib's fan sweep; the tier alone when the
+    // table has no fan entry).
+    // A measurement was taken at the group's present size, `count`; at another
+    // fan it is scaled by the table's ratio between the two (the measurement
+    // sets the level, the table the shape: two copies that measured 7 ms a
+    // peer say nothing about four, which the table puts at twenty times that).
+    auto peerCost = [&](int peA, int peB, int fan) {
+      const bool same = CmiPhysicalNodeID(peA) == CmiPhysicalNodeID(peB);
+      const double table = costCfg.exchangePerPeer(same, fan, odg.replicaExchangeMsgs, (double)odg.replicaExchangeBytes);
+      const double measured = same ? odg.replicaCostNode : odg.replicaCostRemote;
+      if (measured <= 0.0 || count < 2) return table;
+      if (fan == count) return measured;
+      const double tableNow = costCfg.exchangePerPeer(same, count, odg.replicaExchangeMsgs, (double)odg.replicaExchangeBytes);
+      return tableNow > 0.0 ? measured * table / tableNow : measured;
+    };
+    std::vector<double> xcost(members.size(), 0.0);
+    if (count > 1)
+      for (size_t a = 0; a < members.size(); a++)
+      {
+        for (size_t b = 0; b < members.size(); b++)
+          if (a != b) xcost[a] += peerCost(memberPe(members[a]), memberPe(members[b]), count);
+        bins[cands[members[a]].bin].load += xcost[a];
+      }
+    double before = 0.0;
+    for (int b = 0; b < nbins; b++) before = std::max(before, bins[b].load);
+
+    if (want > count)
+    {
+      // More copies. Every count k from count + 1 to the need is planned in
+      // turn, each plan extending the one before by one copy, priced with the
+      // copies' real shares (replicaShare: the declared partition blocks, or
+      // 1/k) and their exchanges; the count that leaves the step's critical
+      // path, the fullest bin anywhere, lowest is taken if it lowers it by
+      // more than the tolerance that defines T. A count that gains nothing on
+      // the way is passed over: three copies of a four-partition object leave
+      // one copy with half of it. The copies that exist now are the only
+      // sources a clone can take its state from and the only ones a notice
+      // can reach. A copy is paid for every step, so relieving a bin that was
+      // not the fullest, or leaving another bin as full as the one relieved,
+      // buys nothing: eight experts on eight GPUs, each 0.7-1.4x the mean,
+      // got two copies that lowered nothing (job 23388275: +29% in bf16
+      // training, +35% in bf16 serving); on Mixtral's real routing (hottest
+      // 1.27x, the next 1.18x) a copy that lowered its own bin but not the
+      // fullest cost +15% in training and gained 10% in serving, where the
+      // exchange is free (job 23411075): the declared cost is what tells the
+      // two apart. Three copies of the SmartMoE routing's hot expert doubled
+      // the training step (job 23581818): the exchange grew with the copies
+      // while the fullest copy kept half the tokens, which the block shares
+      // and the measured exchange cost now put into the plan.
+      const std::vector<int> existing = members;
+      auto homePe = [&](int k) { return stats->from_proc[cands[k].idx]; };
+      int nextRank = 0;
+      for (bool used = true; used; nextRank++)
+      {
+        used = false;
+        for (int k : existing)
+          if (stats->objData[cands[k].idx].replicaRank == nextRank) used = true;
+      }
+      nextRank--;
+      // The tentative state the plans are priced on: the bins' loads and, per
+      // member (existing, then planned), its rank, bin and load. Rebuilt for
+      // every count tried, and the count's copies placed from scratch under
+      // it: a copy's block of partitions, so its share and the host that
+      // feeds it, depends on the count (rank 1 of 2 serves half the
+      // partitions, rank 1 of 4 a quarter), and a copy placed for one count
+      // sat on the wrong host under the next (job 23627965).
+      // prefHost: the host of the copy's inputs (-1: none declared); withInputs: it
+      // got a bin there; otherwise hostRefused/memRefused say why not, and
+      // hostMostLoaded/hostMostCpu the host-time refusal that was closest.
+      struct PlannedCopy { int src; int dst; int rank; bool srcAlone; double after;
+                           int prefHost; bool withInputs; int hostRefused; int memRefused; int hostMostLoaded; double hostMostCpu; };
+      std::vector<double> tbins(nbins);
+      std::vector<int> trank, tbin;
+      std::vector<double> tload, txc;   // txc: each member's exchanges in the tentative state
+      auto resetTentative = [&]() {
+        for (int b = 0; b < nbins; b++) tbins[b] = bins[b].load;
+        trank.clear(); tbin.clear(); tload.clear(); txc = xcost;
+        for (size_t a = 0; a < members.size(); a++)
+        {
+          trank.push_back(stats->objData[cands[members[a]].idx].replicaRank);
+          tbin.push_back(cands[members[a]].bin);
+          tload.push_back(cands[members[a]].load);
+        }
+      };
+      std::vector<PlannedCopy> plan, bestPlan;
+      std::vector<double> afterAt;   // per count tried, the fullest bin it leaves
+      auto holdsBin = [&](int b) { for (int x : tbin) if (x == b) return true; return false; };
+      double bestAfter = before - eps * avg;   // what a plan must beat
+      int bestK = count;
+      bool unplaceable = false;
+      for (int k = count + 1; k <= want && !unplaceable; k++)
+      {
+        resetTentative();
+        plan.clear();
+        for (int c = count; c < k; c++)
+        {
+          const int now = (int)trank.size();
+          size_t srcA = 0;
+          for (size_t a = 0; a < existing.size(); a++)
+            if (tbins[tbin[a]] > tbins[tbin[srcA]]) srcA = a;
+          const int src = existing[srcA];
+          const LDObjData& sod = stats->objData[cands[src].idx];
+          const int srcPe = homePe(src);
+          const int rank = nextRank + (int)plan.size();
+          const double share = L * sod.replicaShare(rank, k);
+          // The destination: the fullest bin that still clears T with the copy's
+          // share, else the emptiest; never a bin the group is already on, and
+          // only where the memory ledger says the copy fits. When the copies
+          // have no exchange to pay for and the object declared partitions, the
+          // bins of the host that originates most of this copy's block of them
+          // (LBManager::setPartition on the feeding PEs) are tried first, and
+          // the others only when none of those can take it: the copy's inputs
+          // then stay on their host (MoE serving, two A100 nodes: every copy of
+          // the hot expert on one host put 100 MB a step each way over the link).
+          int prefHost = -1;
+          if (sod.replicaParts > 0 && sod.replicaExchangeBytes == 0)
+          {
+            const int P = sod.replicaParts, lo = (P * rank) / k, hi = (P * (rank + 1)) / k;
+            std::map<int, int> feeders;
+            for (int pe = 0; pe < stats->nprocs(); pe++)
+            {
+              const int part = stats->procs[pe].partition;
+              if (part >= lo && part < hi) feeders[CmiPhysicalNodeID(pe)]++;
+            }
+            int most = 0;
+            for (const auto& kv : feeders) if (kv.second > most) { most = kv.second; prefHost = kv.first; }
+          }
+          int dst = -1;
+          bool withInputs = false;
+          int hostRefused0 = 0, memRefused0 = 0, hostMostLoaded0 = -1;
+          double hostMostCpu0 = -1.0;
+          for (int pass = (prefHost >= 0 ? 0 : 1); pass < 2 && dst < 0; pass++)
+          {
+          double bestFit = -1.0, emptiest = std::numeric_limits<double>::max();
+          int emptiestBin = -1;
+          int hostRefusedHere = 0, memRefusedHere = 0, hostMostLoaded = -1;
+          double hostMostCpu = -1.0;
+          for (int b = 0; b < nbins; b++)
+          {
+            if (holdsBin(b)) continue;
+            if (pass == 0 && CmiPhysicalNodeID(binPe[b]) != prefHost) continue;
+            if (peCpu[binPe[b]] + sod.wallTime / k > hostCap)
+            {
+              hostRefusals++; hostRefusedHere++;
+              if (peCpu[binPe[b]] > hostMostCpu) { hostMostCpu = peCpu[binPe[b]]; hostMostLoaded = binPe[b]; }
+              continue;
+            }
+  #if CMK_GPU
+            if (!ledger.feasibleArrival(memModel.footprint(cands[src].idx) + sod.replicaExtraFor(k), binPe[b]))
+            {
+              memRefusals++; memRefusedHere++;
+              continue;
+            }
+  #endif
+            const double after = tbins[b] + share;
+            if (after <= T && after > bestFit) { bestFit = after; dst = b; }
+            if (tbins[b] < emptiest) { emptiest = tbins[b]; emptiestBin = b; }
+          }
+          if (dst < 0) dst = emptiestBin;
+          if (pass == 0)
+          {
+            withInputs = dst >= 0;
+            hostRefused0 = hostRefusedHere; memRefused0 = memRefusedHere;
+            hostMostLoaded0 = hostMostLoaded; hostMostCpu0 = hostMostCpu;
+          }
+          }
+  #if CMK_GPU
+          // The source grows by the exchange state too when it was alone.
+          if (dst >= 0 && now == 1 && !ledger.feasibleArrival(sod.replicaExtraFor(2), srcPe))
+          {
+            memRefusals++;
+            dst = -1;
+          }
+  #endif
+          if (dst < 0)
+          {
+            if (CkMyPe() == cur_ld_balancer)
+              CkPrintf("CharmLB> ShedLB: group %d carries %.3f of a mean %.3f and would need %d copies, "
+                       "but no bin can hold copy %d\n", g, L, avg, want, now + 1);
+            unplaceable = true;
+            break;
+          }
+          const int dstPe = binPe[dst];
+          // Every member's share under k copies and its exchanges at fan k (the
+          // fan prices every peer anew), on its bin; the new copy's share and all
+          // its exchanges on the destination.
+          double dstx = 0.0;
+          for (size_t a = 0; a < trank.size(); a++)
+          {
+            const double nl = L * sod.replicaShare(trank[a], k);
+            double nx = peerCost(binPe[tbin[a]], dstPe, k);
+            for (size_t b = 0; b < trank.size(); b++)
+              if (b != a) nx += peerCost(binPe[tbin[a]], binPe[tbin[b]], k);
+            tbins[tbin[a]] += (nl - tload[a]) + (nx - txc[a]);
+            tload[a] = nl;
+            txc[a] = nx;
+            dstx += peerCost(dstPe, binPe[tbin[a]], k);
+          }
+          tbins[dst] += share + dstx;
+          txc.push_back(dstx);
+          trank.push_back(rank); tbin.push_back(dst); tload.push_back(share);
+          double after = 0.0;
+          for (int b = 0; b < nbins; b++) after = std::max(after, tbins[b]);
+          plan.push_back(PlannedCopy{src, dst, rank, now == 1, after, prefHost, withInputs,
+                                     hostRefused0, memRefused0, hostMostLoaded0, hostMostCpu0});
+          if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+            CkPrintf("[ShedLB] group %d: %d copies (copy %d on PE %d, share %.3f, exchange %.3f) would leave the "
+                     "fullest bin at %.3f; now %.3f, to beat %.3f\n", g, k, rank, dstPe, share, dstx, after, before,
+                     before - eps * avg);
+        }
+        if (unplaceable || (int)plan.size() != k - count) break;
+        const double after = plan.back().after;
+        afterAt.push_back(after);
+        if (after < bestAfter) { bestAfter = after; bestK = k; bestPlan = plan; }
+      }
+      plan = bestPlan;
+      if (bestK == count)
+      {
+        if (CkMyPe() == cur_ld_balancer && !afterAt.empty())
+        {
+          double lowest = afterAt[0];
+          int atK = count + 1;
+          for (size_t i = 1; i < afterAt.size(); i++)
+            if (afterAt[i] < lowest) { lowest = afterAt[i]; atK = count + 1 + (int)i; }
+          CkPrintf("CharmLB> ShedLB: group %d: load %.3f exceeds the per-bin target %.3f, but no count up to %d "
+                   "lowers the fullest bin enough (%d copies: %.3f of %.3f): no copy\n",
+                   g, L, T, count + (int)afterAt.size(), atK, lowest, before);
+        }
+        continue;
+      }
+      // The plan up to bestK is taken: the clones and their notices, the
+      // ledger, the members and their loads.
+      for (int i = 0; i < bestK - count; i++)
+      {
+        const PlannedCopy& pc = plan[i];
+        const LDObjData& sod = stats->objData[cands[pc.src].idx];
+        const int srcPe = homePe(pc.src), dstPe = binPe[pc.dst];
+#if CMK_GPU
+        ledger.commitArrival(memModel.footprint(cands[pc.src].idx) + sod.replicaExtraFor(bestK), dstPe);
+        if (pc.srcAlone) ledger.commitArrival(sod.replicaExtraFor(2), srcPe);
+#endif
+        peCpu[dstPe] += sod.wallTime / bestK;
+        pinned[pc.src] = 1;
+        stats->clones.push_back(LBAction{cands[pc.src].idx, srcPe, dstPe, pc.rank});
+        for (int k : existing)
+          if (k != pc.src) stats->cloneNotices.push_back(LBAction{cands[k].idx, homePe(k), dstPe, pc.rank});
+        clonesPlanned++;
+        if (CkMyPe() == cur_ld_balancer)
+          CkPrintf("CharmLB> ShedLB: replicate group %d: load %.3f exceeds the per-bin target %.3f "
+                   "(mean %.3f); copy %d from PE %d to PE %d, %d copies in all, this one %.3f; "
+                   "the fullest bin %.3f -> %.3f\n",
+                   g, L, T, avg, pc.rank, srcPe, dstPe, bestK, L * sod.replicaShare(pc.rank, bestK), before, pc.after);
+        // Where the copy's inputs are, or why not: the placement is a decision
+        // the run should show, as the copy is.
+        if (CkMyPe() == cur_ld_balancer && pc.prefHost >= 0)
+        {
+          if (pc.withInputs)
+            CkPrintf("[ShedLB] group %d copy %d: placed with its inputs, on host %d\n", g, pc.rank, pc.prefHost);
+          else
+            CkPrintf("[ShedLB] group %d copy %d: no bin on host %d, where its inputs are, could take it: "
+                     "%d refused for host time (the closest, PE %d, at %.3f against the cap %.3f), %d for memory\n",
+                     g, pc.rank, pc.prefHost, pc.hostRefused, pc.hostMostLoaded, pc.hostMostCpu, hostCap, pc.memRefused);
+        }
+        // The new copy is a member for the same-bin rule and the loads for the rest of the step.
+        cands.push_back(Cand{cands[pc.src].idx, 0.0, cands[pc.src].bytes, pc.dst});
+        pinned.push_back(1);
+        members.push_back((int)cands.size() - 1);
+        xcost.push_back(0.0);
+      }
+      for (size_t a = 0; a < members.size(); a++)
+      {
+        const int k = members[a];
+        const int r = a < existing.size() ? stats->objData[cands[k].idx].replicaRank : plan[a - existing.size()].rank;
+        const double nl = L * odg.replicaShare(r, bestK);
+        double nx = 0.0;
+        for (size_t c = 0; c < members.size(); c++)
+          if (c != a) nx += peerCost(binPe[cands[k].bin], binPe[cands[members[c]].bin], bestK);
+        bins[cands[k].bin].load += (nl + nx) - (cands[k].load + xcost[a]);
+        cands[k].load = nl;
+        xcost[a] = nx;
+      }
+    }
+    else if (count > 1)
+    {
+      // One copy fewer: the highest-ranked copy, so the application's
+      // partition of the work over ranks 0..k-1 stays contiguous. Taken back
+      // when the remaining copies would sit below the mean (T (1 - eps) ~
+      // avg), or when the exchanges cost the critical path more than the
+      // sharing saves it.
+      // Each remaining copy's share under count - 1 copies (its partition block).
+      auto shareOf = [&](int k) { return L * odg.replicaShare(stats->objData[cands[k].idx].replicaRank, count - 1); };
+      double share = 0.0;   // the largest of them: what must fit below the target
+      for (int k : members)
+        if (stats->objData[cands[k].idx].replicaRank < count - 1) share = std::max(share, shareOf(k));
+      int victim = -1;
+      for (int k : members)
+      {
+        if (stats->objData[cands[k].idx].replicaRank == 0) continue;
+        if (victim < 0 || stats->objData[cands[k].idx].replicaRank >
+                              stats->objData[cands[victim].idx].replicaRank)
+          victim = k;
+      }
+      if (victim < 0) continue;
+      const int vPe = stats->from_proc[cands[victim].idx];
+      size_t va = 0;
+      for (size_t a = 0; a < members.size(); a++) if (members[a] == victim) va = a;
+      // The remaining copies' exchanges at the smaller fan.
+      std::vector<double> nxc(members.size(), 0.0);
+      for (size_t a = 0; a < members.size(); a++)
+        for (size_t c = 0; c < members.size(); c++)
+          if (c != a && members[c] != victim && members[a] != victim)
+            nxc[a] += peerCost(memberPe(members[a]), memberPe(members[c]), count - 1);
+      double after = 0.0;
+      for (int b = 0; b < nbins; b++)
+      {
+        double l = bins[b].load;
+        for (size_t a = 0; a < members.size(); a++)
+        {
+          const int k = members[a];
+          if (cands[k].bin != b) continue;
+          if (k == victim) l -= cands[k].load + xcost[a];
+          else l += (shareOf(k) + nxc[a]) - (cands[k].load + xcost[a]);
+        }
+        after = std::max(after, l);
+      }
+      const bool fits = share <= T * (1.0 - eps);
+      const bool cheaper = after <= before - eps * avg;
+      if (!fits && !cheaper) continue;
+      bins[cands[victim].bin].load -= cands[victim].load + xcost[va];
+      peCpu[vPe] -= stats->objData[cands[victim].idx].wallTime;
+      for (size_t a = 0; a < members.size(); a++)
+      {
+        const int k = members[a];
+        if (k == victim) continue;
+        bins[cands[k].bin].load += (shareOf(k) + nxc[a]) - (cands[k].load + xcost[a]);
+        cands[k].load = shareOf(k);
+        xcost[a] = nxc[a];
+      }
+      cands[victim].load = 0.0;
+      pinned[victim] = 1;
+      const int vRank = stats->objData[cands[victim].idx].replicaRank;
+      stats->retires.push_back(LBAction{cands[victim].idx, vPe, vPe, vRank});
+      for (int k : members)
+        if (k != victim) stats->retireNotices.push_back(LBAction{cands[k].idx, stats->from_proc[cands[k].idx], vPe, vRank});
+      retiresPlanned++;
+      if (CkMyPe() == cur_ld_balancer)
+        CkPrintf("CharmLB> ShedLB: retire replica %d of group %d on PE %d: %s (load %.3f, %d copies, "
+                 "fullest bin %.3f -> %.3f, target %.3f, mean %.3f)\n",
+                 stats->objData[cands[victim].idx].replicaRank, g, vPe,
+                 fits ? "the group fits fewer copies" : "the exchange costs more than the sharing saves",
+                 L, count - 1, before, after, T * (1.0 - eps), avg);
+      xcost.erase(xcost.begin() + va);
+      members.erase(std::find(members.begin(), members.end(), victim));
+    }
+  }
+  if (clonesPlanned || retiresPlanned)
+  {
+    maxLoad = 0.0;
+    for (int b = 0; b < nbins; b++) maxLoad = std::max(maxLoad, bins[b].load);
+  }
+
+  if (maxLoad <= T)
+  {
+    if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+      CkPrintf("[ShedLB] max/avg %.3f already within 1+eps (%.3f): no moves\n",
+               maxLoad / avg, 1.0 + eps);
+    return;
+  }
+
+  // ---- shed and place -------------------------------------------------
+  // One transfer at a time, always off the fullest bin. A candidate is only
+  // worth moving if some other bin can take it and stay under T: an object
+  // larger than a bin's whole share cannot be placed anywhere, so moving it
+  // buys nothing and costs its bytes. Deciding shed and placement together is
+  // what keeps that case from silently consuming the bin's excess -- an
+  // earlier version debited the excess for such an object, put it straight
+  // back where it came from, and left the bin overloaded having moved nothing.
+  //
+  // Among the objects that can be placed, prefer the ones that fit inside the
+  // excess (so the bin is not sent below its share for nothing), and among
+  // those the highest load per byte: the most excess cleared per byte staged.
+  // If none fits inside the excess, take the smallest load, which overshoots
+  // least. That last case is the granularity term in the bound.
+  std::vector<char> moved(cands.size(), 0);
+  int moves = 0;
+  double shedBytes = 0.0;
+
+  for (;;)
+  {
+    int h = 0;
+    for (int b = 1; b < nbins; b++)
+      if (bins[b].load > bins[h].load) h = b;
+    if (bins[h].load <= T) break;
+    const double excess = bins[h].load - T;
+    for (int b = 0; b < nbins; b++) binPe[b] = landingPe(b);
+
+    int pick = -1, pickDst = -1;
+    double pickScore = -1.0, pickSmallest = std::numeric_limits<double>::max();
+    for (size_t k = 0; k < cands.size(); k++)
+    {
+      if (moved[k] || pinned[k]) continue;
+      const Cand& c = cands[k];
+      if (c.bin != h) continue;
+      const LDObjData& cod = stats->objData[c.idx];
+
+      // Best fit among the other bins: fullest that still clears T.
+      int dst = -1;
+      double bestAfter = -1.0;
+      for (int b = 0; b < nbins; b++)
+      {
+        if (b == h) continue;
+        // Copies of one group never share a bin.
+        if (cod.replicable() && groupHoldsBin(cod.replicaGroup, b)) continue;
+        const double after = bins[b].load + c.load;
+        if (!(after <= T && after > bestAfter)) continue;
+        if (peCpu[binPe[b]] + cod.wallTime > hostCap) { hostRefusals++; continue; }
+#if CMK_GPU
+        if (!ledger.feasible(c.idx, stats->from_proc[c.idx], binPe[b]))
+        {
+          memRefusals++;
+          continue;
+        }
+#endif
+        bestAfter = after;
+        dst = b;
+      }
+      if (dst < 0) continue;   // nowhere to put it: not a candidate at all
+
+      if (c.load <= excess)
+      {
+        const double score = c.load / c.bytes;
+        if (pickScore < 0.0 || score > pickScore) { pickScore = score; pick = (int)k; pickDst = dst; }
+      }
+      else if (pickScore < 0.0 && c.load < pickSmallest)
+      {
+        pickSmallest = c.load;   // only if nothing fits inside the excess
+        pick = (int)k;
+        pickDst = dst;
+      }
+    }
+    if (pick < 0) break;   // this bin cannot be improved; neither can any fuller one
+
+    Cand& c = cands[pick];
+    moved[pick] = 1;
+    bins[h].load -= c.load;
+    bins[pickDst].load += c.load;
+    c.bin = pickDst;
+    shedBytes += c.bytes;
+
+    // Within the destination bin, the least host-loaded PE. Host time decides
+    // only this, never which bin the object lands on.
+    const int oldPe = stats->from_proc[c.idx];
+    const int dstPe = binPe[pickDst];
+    if (dstPe != oldPe)
+    {
+#if CMK_GPU
+      ledger.commit(c.idx, oldPe, dstPe);
+#endif
+      stats->to_proc[c.idx] = dstPe;
+      peCpu[dstPe] += stats->objData[c.idx].wallTime;
+      peCpu[oldPe] -= stats->objData[c.idx].wallTime;
+      moves++;
+    }
+  }
+
+  if (CkMyPe() == cur_ld_balancer)
+  {
+    // The refusal counts are decisions the run should show; the bins' summary
+    // is the debug view.
+#if CMK_GPU
+    if (memRefusals > 0)
+      CkPrintf("[ShedLB] %d destination check(s) refused because the bin could not "
+               "hold the object\n", memRefusals);
+#endif
+    if (hostRefusals > 0)
+      CkPrintf("[ShedLB] %d destination check(s) refused because the PE's host time would pass %.3f "
+               "(the device target %.3f, the hosts' mean %.3f)\n", hostRefusals, hostCap, T, hostMean);
+  }
+  if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+  {
+    double after = 0.0;
+    for (int b = 0; b < nbins; b++) after = std::max(after, bins[b].load);
+    CkPrintf("[ShedLB] %d bins on %s time: max/avg %.3f -> %.3f (target %.3f), "
+             "%d of %d objects moved, %.1f MB staged\n",
+             nbins, useGpu ? "device" : "host", maxLoad / avg, after / avg,
+             1.0 + eps, moves, (int)cands.size(), shedBytes / 1e6);
+  }
+}
+
+#include "ShedLB.def.h"
+
+/*@}*/

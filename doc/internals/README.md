@@ -39,6 +39,7 @@ entry, and is planned once there is more than one chapter.
 | [Nodegroup lookup](nodegroup-lookup.md) | written 2026-11-25: the lock-free table of ready nodegroups read by `CkLocalNodeBranch` and nodegroup message delivery |
 | Groups and nodegroups: creation, dependencies, delivery | not yet written |
 | Load balancing: the LB framework and TreeLB | not yet written |
+| [Replication as a load-balancing decision](lb-multiplicity.md) | written 2026-10-31, updated 2026-11-27: the replica declaration, clone/retire decision kinds, their delivery and memory accounting, ShedLB's group pass |
 | [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); of the disk checkpoint, how it waits for migrations; the rest of the disk checkpoint and shrink/expand not yet written |
 | The reconverse layer: what Charm++ asks of the machine layer | not yet written |
 | [Coroutine entry methods (ckcoro)](coroutine-sdag.md) | written 2026-11-09 with the prototype: entry methods as C++20 coroutines, the inbox, the restart protocol (design in `doc/coroutine-sdag-design.md`) |

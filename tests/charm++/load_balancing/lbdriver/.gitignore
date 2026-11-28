@@ -1,0 +1,13 @@
+lbdriver
+lbsim
+lbsim-standalone
+metis_replay
+reseed-test
+ringflow-test
+*.o
+*.decl.h
+*.def.h
+*.json
+*.html
+charmrun
+__pycache__/

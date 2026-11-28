@@ -121,6 +121,7 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessMigrationDecision();
   void ProcessReceiveMigration();
+  void ReleaseNextBatch();
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
@@ -228,6 +229,9 @@ public:
 	virtual void changeFreq(int n);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
+  // Hands a Clone / Retire record (LBDecisionKind) addressed to this PE to its
+  // object; see LDObjData::replicaGroup.
+  void executeReplicaDecision(const LDObjHandle& h, unsigned char kind, int toPe, int rank);
 
   // Not to be used -- maintained for legacy applications
   virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
@@ -264,6 +268,17 @@ private:
   bool  reduction_started;
   bool  use_thread;
 
+  // Batched migration execution (memory contract I-batch). The decision PE
+  // stashes one message per batch and releases them sequentially; every PE
+  // tracks which batch it is executing so MigrationDone can distinguish a
+  // batch boundary (reset counters, contribute to ReleaseNextBatch) from the
+  // end of the step (resume clients).
+  std::vector<LBMigrateMsg*> lbBatchMsgs;
+  int lbNextBatch = 0;
+  int lbCurBatch = 0;
+  int lbCurNBatches = 1;
+  void sendDecision(LBMigrateMsg* msg);
+
   FutureModel *predicted_model;
 
   void BuildStatsMsg();
@@ -286,11 +301,19 @@ public:
 
   int from_pe;
   int pe_speed;
+  int partition;   // LBManager::setPartition, -1 none
 #if CMK_CUDA
   // GPU this PE is mapped to and that device's SM count; see
   // BaseLB::ProcStats, into which these are copied on arrival.
   uint64_t gpu_device_id;
   int gpu_total_sms;
+  // Device memory for the memory contract (hapiLBDeviceMemory); see
+  // BaseLB::ProcStats.
+  size_t gpu_mem_remaining;
+  size_t pool_buff_mem_remaining;
+  size_t gpu_pool_arena_bytes;
+  size_t gpu_pool_capacity_bytes;
+  int gpu_ipc_slots;
 #endif
   LBRealType total_walltime;
   LBRealType idletime;
@@ -307,9 +330,11 @@ public:
 
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg(): from_pe(0), pe_speed(0),
+  CLBStatsMsg(): from_pe(0), pe_speed(0), partition(-1),
 #if CMK_CUDA
 		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
+		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
+		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
 #endif
 		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),

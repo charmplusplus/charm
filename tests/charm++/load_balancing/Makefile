@@ -5,6 +5,8 @@ DIRS = \
   lb_userdata_test \
   migrate_then_atsync \
   lbsweep \
+  memcontract \
+  replica_test \
 
 TESTDIRS = $(DIRS)
 

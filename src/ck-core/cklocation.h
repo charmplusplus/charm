@@ -478,6 +478,9 @@ private:
   friend class CkLocation;  // so it can call pupElementsFor
   friend class ArrayElement;
   friend class MemElementPacker;
+  // The balancer's replication decisions reach the element(s) at a location
+  // through callMethod (CkLocRec::staticClone / staticRetire).
+  friend class CkLocRec;
 
   using ArrayIdMap = std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher>;
   using MsgBuffer = std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> >;

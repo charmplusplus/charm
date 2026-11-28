@@ -14,7 +14,17 @@
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
-#define LB_FORMAT_VERSION 3
+// 4 adds the object position to LDObjData.
+// 5 adds device memory, the device pool's arena quantum and the IPC slot
+//   budget to ProcStats (the memory contract's inputs).
+// 6 is not used.
+// 7 adds the device pool's capacity to ProcStats.
+// 8 adds the replication declaration (replicaGroup ...) to LDObjData.
+// 9 adds a copy's recurring exchange cost (replicaCostNode / replicaCostRemote).
+// 10 adds the partition count behind a copy's share (replicaParts), the bytes and messages a copy
+//    exchanges with a peer per interval, and the device bytes a further peer adds to it.
+// 11 adds the input partition a PE originates to ProcStats.
+#define LB_FORMAT_VERSION 11
 
 #define LB_MANAGER_VERSION 1
 
@@ -39,6 +49,44 @@ class CkLBArgs
   bool _lb_useCpuTime;      // use cpu instead of wallclock time
   bool _lb_statson;         // stats collection
   bool _lb_traceComm;       // stats collection for comm
+  bool _lb_diffcomm;        // DiffusionLB: use the communication graph
+  // Path to the transfer-cost table written by the lbcalib benchmark. Empty
+  // means no cost model: DiffusionLB accepts every quota-driven move.
+  const char* _lb_costConfig;
+  bool _lb_noMST;           // DiffusionLB: skip MST neighbor construction
+  int _lb_diffnumnbors;     // DiffusionLB: number of diffusion neighbors
+  double _lb_diffbeta;      // DiffusionLB: second-order diffusion momentum (1.0 = off)
+  // Which load dimension the one-dimensional balancers (MetisLB's cross level,
+  // DiffusionLB's across-node phase, every ckgraph consumer) balance. Neither
+  // flag: the dimension that binds, measured per step (LBLoadDim.h).
+  bool _lb_diffgpudim;      // force device occupancy
+  bool _lb_diffhostdim;     // force host time
+  // DiffusionLB decision floors. An imbalance below _lb_diffMinImbalance (a
+  // fraction of the mean) is treated as measurement noise and left alone, at
+  // both the across-node and the within-node level. _lb_diffMaxMoveFrac caps
+  // the share of a node's migratable LOAD that may leave it across nodes in
+  // one step; 1.0, the default, applies no cap and lets the pseudo rounds'
+  // own obligation govern. A cap below 1 is spent on one neighbour at a time
+  // (selection stays with a neighbour until it can take nothing more), so a
+  // node far above its fair share exhausts the budget on its first
+  // destination and never reaches the rest: measured on sph2d, 0.25 left
+  // node 0 shedding 2.23 of the 6.16 it owed and cost 13 ms/step.
+  double _lb_diffMinImbalance;
+  double _lb_diffMaxMoveFrac;
+  // ShedLB: no bin may exceed (1 + _lb_shedEps) times the mean load. Below
+  // the largest object's share of the mean it cannot be met at all, because
+  // an indivisible object sets a floor on any assignment's maximum.
+  //
+  // The default is not "as tight as possible". A target tighter than the rate
+  // at which load drifts buys precision the next step destroys and pays for it
+  // in migrations: on the moe example at Llama size, 0.02 moved 19 objects for
+  // 549 ms and 0.10 moved 7 for 490 ms, with 0.20 losing the balance again at
+  // 538 ms. Match it to how far load moves between balancing steps.
+  double _lb_shedEps;
+  // The alpha (LBLoadDim.h) at or above which BOTH load dimensions count:
+  // DiffusionLB then diffuses step time and MetisLB carries the second
+  // dimension as a partition constraint. Above 1 never; 0 always.
+  double _lb_loadVectorAbove;
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
@@ -72,6 +120,19 @@ class CkLBArgs
     _lb_printsummary = _lb_migObjOnly = false;
     _lb_statson = true;
     _lb_traceComm = false;
+    _lb_diffcomm = false;
+    _lb_costConfig = NULL;
+    _lb_noMST = false;
+    _lb_diffnumnbors = 1;
+    _lb_diffbeta = 1.0;
+    _lb_diffgpudim = false;
+    _lb_diffhostdim = false;
+    // DiffusionLB's floor: 0.03 made it over-move on sph2d's moving load (1.86
+    // vs 1.66 ms/step); MetisLB has its own floor.
+    _lb_diffMinImbalance = 0.10;
+    _lb_diffMaxMoveFrac = 1.0;
+    _lb_shedEps = 0.10;
+    _lb_loadVectorAbove = 0.5;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -95,6 +156,17 @@ class CkLBArgs
   inline bool& useCpuTime() { return _lb_useCpuTime; }
   inline bool& statsOn() { return _lb_statson; }
   inline bool& traceComm() { return _lb_traceComm; }
+  inline bool& diffusionCommOn() { return _lb_diffcomm; }
+  inline const char*& costConfig() { return _lb_costConfig; }
+  inline bool& noMST() { return _lb_noMST; }
+  inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
+  inline double& diffusionBeta() { return _lb_diffbeta; }
+  inline bool& diffusionGpuDim() { return _lb_diffgpudim; }
+  inline bool& diffusionHostDim() { return _lb_diffhostdim; }
+  inline double& shedEps() { return _lb_shedEps; }
+  inline double& diffusionMinImbalance() { return _lb_diffMinImbalance; }
+  inline double& diffusionMaxMoveFrac() { return _lb_diffMaxMoveFrac; }
+  inline double& loadVectorAbove() { return _lb_loadVectorAbove; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }
@@ -254,6 +326,7 @@ class LBManager : public CBase_LBManager
   };
 
   LBDatabase* lbdb_obj;
+  int pePartition = -1;
 
   // CCS handler "LBObjLoads": pending reply tokens and whether a collection
   // round is in flight (one round serves every request that arrived meanwhile)
@@ -304,6 +377,12 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->RegisterOM(userID, userptr, cb);
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
+  // Replication decisions (see LDObjData::replicaGroup); 0 when the handle no
+  // longer names the object the decision was made for.
+  int Clone(LDObjHandle h, int dest, int rank) { return lbdb_obj->Clone(h, dest, rank); }
+  int Retire(LDObjHandle h) { return lbdb_obj->Retire(h); }
+  int CloneNotice(LDObjHandle h, int dest, int rank) { return lbdb_obj->CloneNotice(h, dest, rank); }
+  int RetireNotice(LDObjHandle h, int rank) { return lbdb_obj->RetireNotice(h, rank); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
   void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
@@ -360,6 +439,26 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->SetObjGPULoad(id_loadMap);
   }
+  void SetObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos)
+  {
+    lbdb_obj->ObjPosition(h, pos);
+  }
+  const std::vector<LBRealType>& GetObjPosition(LDObjHandle h)
+  {
+    return lbdb_obj->GetObjPosition(h);
+  }
+  // Replication declaration; see LDObjData::replicaGroup.
+  void SetObjReplica(LDObjHandle h, int group, int rank, int count, int maxCount, size_t extraBytes,
+                     double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                     size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0)
+  {
+    lbdb_obj->ObjReplica(h, group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                         exchangeBytes, exchangeMsgs, extraPerPeer);
+  }
+  void GetObjReplica(LDObjHandle h, int& group, int& rank, int& count, int& maxCount, size_t& extraBytes)
+  {
+    lbdb_obj->GetObjReplica(h, group, rank, count, maxCount, extraBytes);
+  }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)
@@ -368,6 +467,7 @@ class LBManager : public CBase_LBManager
   }
   void ClearLoads(void) { lbdb_obj->ClearLoads(); }
   const LDObjHandle& GetObjHandle(int idx) { return lbdb_obj->GetObjHandle(idx); }
+  bool LiveObjHandle(int idx, CmiUInt8 id, LDObjHandle& h) { return lbdb_obj->LiveObjHandle(idx, id, h); }
   void IdleTime(LBRealType* walltime) { lbdb_obj->IdleTime(walltime); }
   void TotalTime(LBRealType* walltime, LBRealType* cputime)
   {
@@ -451,6 +551,21 @@ class LBManager : public CBase_LBManager
   int AddMigrationDoneFn(std::function<void()> fn);
   void RemoveMigrationDoneFn(int handle);
   void MigrationDone();
+  // How many decisions (moves, copies, retirements, job-wide) the last
+  // balancing round made, known on every PE before its MigrationDone callbacks
+  // run; -1 before the first round. An application that holds work back
+  // around a round for the sake of migrations can let it go when this is 0.
+  void SetLastRoundDecisions(int n) { lastRoundDecisions = n; }
+  int LastRoundDecisions() const { return lastRoundDecisions; }
+  // The partition of a replicated object's inputs that this PE originates
+  // (ProcStats::partition; -1, the default, none). A copy of rank r among k of
+  // an object with P partitions serves partitions [P r / k, P (r + 1) / k)
+  // (LDObjData::replicaShare), and a balancer that knows which PEs feed those
+  // partitions can place the copy on their host (ShedLB does, when the copies
+  // have no exchange to pay for). Declared once by the application, usually
+  // at start-up, by every PE that originates inputs.
+  void setPartition(int p) { pePartition = p; }
+  int partition() const { return pePartition; }
 
  public:
   inline void TurnManualLBOn() { useBarrier = false; }
@@ -556,6 +671,7 @@ class LBManager : public CBase_LBManager
 
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
+  int lastRoundDecisions = -1;
 
  public:
   BaseLB** getLoadBalancers() { return loadbalancers.data(); }
@@ -588,6 +704,7 @@ class LBManager : public CBase_LBManager
   const char* loadbalancer(int seq);
 
   inline int step() { return mystep; }
+  int lbEventsDone;   // balancing events completed here (see nextLoadbalancer)
   inline void incStep() { mystep++; }
 };
 

@@ -13,6 +13,28 @@
 #define PER_MESSAGE_RECV_OVERHEAD  	    0.0
 #define PER_BYTE_RECV_OVERHEAD      	    0.0
 
+/// What a decision record asks of its object. A Move is a migration from
+/// from_pe to to_pe. A Clone asks the object on from_pe to make a copy of
+/// itself on to_pe with replica rank `rank`; a Retire asks the copy on
+/// from_pe to go away. Both apply only to objects whose application declared
+/// them replicable (LDObjData::replicaGroup) and are executed by the
+/// application through CkMigratable::ckClone / ckRetire; the balancer never
+/// counts them as arrivals.
+// A notice goes to every other copy of the group a clone or retire changes, so all copies act in the
+// same step (the application partitions its work by copy count).
+enum LBDecisionKind : unsigned char { LB_DECISION_MOVE = 0, LB_DECISION_CLONE = 1, LB_DECISION_RETIRE = 2,
+                                      LB_DECISION_CLONE_NOTICE = 3, LB_DECISION_RETIRE_NOTICE = 4 };
+
+/// A replication decision a strategy adds beside its to_proc assignment
+/// (LDStats::clones / retires): obj is the stats index of the copy it
+/// addresses -- the source of a clone, the copy a retire removes.
+struct LBAction {
+  int obj;
+  int fromPe;
+  int toPe;   // the clone's destination; unused by a retire
+  int rank;   // the clone's replica rank; unused by a retire
+};
+
 /// Base class for all LB strategies.
 /**
   BaseLB is the base class for all LB strategy class.
@@ -26,6 +48,20 @@ protected:
   const char *lbname;
   LBManager *lbmgr;
   int  startLbFnHdl;
+
+  // LB timing instrumentation, used by DiffusionLB to separate strategy time from
+  // total LB time (migration included).
+  static double totalLBTime;
+  static double lbStartTime;
+  static double totalLBStrategyTime;
+  static int totalPhases;
+
+  static void startLBTiming() { lbStartTime = CmiWallTimer(); }
+  static void endLBStrategyTiming() { totalLBStrategyTime += CmiWallTimer() - lbStartTime; }
+  static void endLBTiming() {
+    totalLBTime += CmiWallTimer() - lbStartTime;
+    totalPhases += 1;
+  }
 private:
   void initLB(const CkLBOptions &);
 public:
@@ -52,24 +88,40 @@ public:
 #endif
     // double utilization;
     int pe;			// processor id
+    int partition;		// the input partition this PE originates (LBManager::setPartition), -1 none
     bool available;
-#if CMK_CUDA
+#if CMK_GPU
+    // Device memory as the memory contract reads it (hapiLBDeviceMemory):
+    // free device bytes; this process's free pool bytes on the device (or the
+    // +gpulbbuffer region's, without the pool); the pool's arena quantum (0
+    // without it); the pool's capacity on the device, free or not, which the
+    // contract's reserve is measured against (0: not reported; format 7); and
+    // the IPC event slots a batch may use from this PE.
+    size_t gpu_mem_remaining;
+    size_t pool_buff_mem_remaining;
+    size_t gpu_pool_arena_bytes;
+    size_t gpu_pool_capacity_bytes;
+    int gpu_ipc_slots;
+#endif
     /// GPU this PE is mapped to, as (physical node id << 32 | device index),
     /// so that the same physical device is one value across every process that
-    /// shares it. -1 when this PE has no GPU. PEs with equal values form the
-    /// GPU group a GPU-aware strategy balances across.
+    /// shares it. -1 when this PE has no GPU, and on every PE of a build
+    /// without one, so a strategy that groups PEs by device sees one group.
+    /// PEs with equal values form the GPU group a GPU-aware strategy balances
+    /// across.
     uint64_t gpu_device_id;
     /// SM count of that GPU, 0 if it could not be queried.
     int gpu_total_sms;
-#endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif
-#if CMK_CUDA
-		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
+#if CMK_GPU
+		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
+		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
 #endif
-	   	 bg_walltime(0.0), pe(-1), available(true) {}
+		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
+	   	 bg_walltime(0.0), pe(-1), partition(-1), available(true) {}
     inline void clearBgLoad() {
       idletime = bg_walltime = 
 #if CMK_LB_CPUTIMER
@@ -91,9 +143,16 @@ public:
       }
       p|available; p|n_objs;
       if (_lb_args.lbversion()>=2) p|pe;
-#if CMK_CUDA
+      if (_lb_args.lbversion()>=11) p|partition;
+#if CMK_GPU
       p|gpu_device_id;
       p|gpu_total_sms;
+      // Format 5 adds the device memory the contract reads; format 7 the pool's capacity.
+      if (_lb_args.lbversion() > 4) {
+        p|gpu_mem_remaining; p|pool_buff_mem_remaining;
+        p|gpu_pool_arena_bytes; p|gpu_ipc_slots;
+      }
+      if (_lb_args.lbversion() > 6) p|gpu_pool_capacity_bytes;
 #endif
     }
   };
@@ -103,9 +162,17 @@ public:
     std::vector<ProcStats> procs;		// processor statistics
 
     int n_migrateobjs;		// total number of migratable objects
+    int n_nodes;			// total number of nodes (differs from procs in SMP)
     std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
     std::vector<int> from_proc;	// current pe an object is on
     std::vector<int> to_proc;		// new pe you want the object to be on
+    // Replication decisions beside the assignment above (see LBAction). Only
+    // a strategy that understands replica groups fills them; createMigrateMsg
+    // turns them into Clone / Retire records after the moves.
+    std::vector<LBAction> clones;
+    std::vector<LBAction> retires;
+    std::vector<LBAction> cloneNotices;    // to the other copies: obj = the copy told, toPe/rank = the clone's
+    std::vector<LBAction> retireNotices;   // to the other copies: obj = the copy told, rank = the retired copy's
 
     std::vector<LDCommData> commData;	// communication data - edge list representation
 				// of the communication between objects
@@ -142,6 +209,10 @@ public:
       commData.clear();
       from_proc.clear();
       to_proc.clear();
+      clones.clear();
+      retires.clear();
+      cloneNotices.clear();
+      retireNotices.clear();
       deleteCommHash();
     }
     void clearBgLoad() {
@@ -178,14 +249,17 @@ public:
 };
 
 /// migration decision for an obj.
-struct MigrateInfo {  
+struct MigrateInfo {
     int index;   // object index in objData array
     LDObjHandle obj;
     int from_pe;
     int to_pe;
     int async_arrival;	    // if an object is available for immediate migrate
-    MigrateInfo():  async_arrival(0) {
+    unsigned char kind;     // LBDecisionKind
+    int rank;               // replica rank of the copy a Clone makes
+    MigrateInfo():  async_arrival(0), kind(LB_DECISION_MOVE), rank(0) {
     }
+    bool isMove() const { return kind == LB_DECISION_MOVE; }
 
     void pup(PUP::er &p) {
       p | index;
@@ -193,6 +267,8 @@ struct MigrateInfo {
       p | from_pe;
       p | to_pe;
       p | async_arrival;
+      p | kind;
+      p | rank;
     }
 };
 
@@ -200,11 +276,20 @@ struct MigrateDecision {
   LDObjIndex dbIndex;
   int fromPe;
   int toPe;
+  unsigned char kind;     // LBDecisionKind
+  int rank;
+  // The object's id, so a Clone / Retire can be checked against the slot
+  // dbIndex names on its PE (slots are reused when objects die).
+  CmiUInt8 id;
+  bool isMove() const { return kind == LB_DECISION_MOVE; }
 
   MigrateDecision &operator=(const MigrateInfo &mInfo) {
     dbIndex = mInfo.obj.handle;
     fromPe = mInfo.from_pe;
     toPe = mInfo.to_pe;
+    kind = mInfo.kind;
+    rank = mInfo.rank;
+    id = mInfo.obj.id;
 
     return *this;
   }
@@ -216,6 +301,12 @@ public:
   int numMigrates;
   int firstPeInSpan;
   int lastPeInSpan;
+  // Batched migration execution (the memory contract's I-batch): which batch
+  // of the step's decision this message carries, out of how many.
+  int lb_batch;
+  int lb_nbatches;
+  // Decisions of the whole step, job-wide (LBManager::LastRoundDecisions).
+  int totalDecisions;
   int *numMigratesPerPe;
   MigrateDecision *moves;
 
@@ -223,6 +314,9 @@ public:
     numMigrates = 0;
     firstPeInSpan = firstPe;
     lastPeInSpan = lastPe;
+    lb_batch = 0;
+    lb_nbatches = 1;
+    totalDecisions = 0;
   }
 };
 
@@ -243,12 +337,19 @@ public:
 
   double * expectedLoad;	// expected load for future
 
+  // Batched migration execution (the memory contract's I-batch): which batch
+  // of the step's decision this message carries, out of how many.
+  int lb_batch;
+  int lb_nbatches;
+
 public:
-  LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
+  LBMigrateMsg(): level(0), n_moves(0), next_lb(0), lb_batch(0), lb_nbatches(1) {}
   void pup(PUP::er &p) {
     int i;
     p | level;
     p | n_moves;
+    p | lb_batch;
+    p | lb_nbatches;
     // Warning: it relies on the fact that the message has been allocated already
     // with the correct number of moves!
     p | next_lb;

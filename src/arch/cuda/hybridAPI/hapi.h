@@ -305,6 +305,24 @@ void hapiCuptiStopTracing();
 bool hapiCuptiTracingActive();
 #endif
 
+// Device memory as the load balancer's memory contract reads it
+// (LBMemoryContract.h), for the calling PE's device:
+//   devFree     free device bytes (cudaMemGetInfo); shared by every process
+//               on the device
+//   poolFree    the free bytes of the +gpulbbuffer region, the staging space
+//               a device migration uses; 0 without +gpushm
+//   arenaBytes  the arena quantum of a device pool chare state and staging
+//               share; 0, since staging is the separate +gpulbbuffer reserve
+//   ipcSlots    CUDA IPC event slots this PE may spend on migrations in one
+//               batch: three quarters of its slice, since application sends
+//               draw on the same slots. 0 when there is no IPC slot pool.
+void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
+                        int* ipcSlots);
+// The capacity of a device pool on the calling PE's device, free or not, which
+// the contract measures its reserve against (LBMigrateWindow.h); 0 when the
+// runtime has no device pool, as here.
+size_t hapiLBDevicePoolCapacity();
+
 // Attribute one kernel launch to the running object. The runtime already
 // brackets every entry method this way (see CkCallstackPush/Pop), so an
 // application needs this only for a launch it makes outside one.
