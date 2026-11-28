@@ -7,6 +7,7 @@ DIRS = \
   lbsweep \
   memcontract \
   lbdriver \
+  replica_test \
 
 TESTDIRS = $(DIRS)
 
