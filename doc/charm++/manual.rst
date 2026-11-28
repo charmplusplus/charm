@@ -9108,7 +9108,9 @@ The API to checkpoint the application is:
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+complete. The checkpoint is written once no array element is migrating,
+so an element that called ``migrateMe`` before ``CkStartCheckpoint`` is
+written on its new PE. If ``CkStartCheckpoint`` is called again before ``cb`` has
 been called, the new request may be silently dropped. When the
 optional parameter ``requestStatus`` is true, the callback ``cb`` is
 sent a message of type ``CkCheckpointStatusMsg`` which includes an
@@ -10660,6 +10662,38 @@ selects a different LCI bootstrap backend instead. An example program to demonst
 ``examples/charm++/mpi-coexist``. In the following text, we will refer to
 this example program for the ease of understanding.
 
+There are two modes:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - Library mode
+     - Main mode
+   * - Use
+     - An MPI program calls Charm++ libraries in phases
+     - A Charm++ program with a mainchare runs inside an MPI job and
+       calls MPI from its entry methods
+   * - Start
+     - ``main`` calls ``MPI_Init_thread``, then ``CharmLibInit``
+     - ``main`` is ``return CharmMpiMain(argc, argv);``, or is supplied
+       by ``charmc -mpi-main``; MPI is initialized there
+   * - ``CkExit``
+     - Returns to its caller; ends a phase (``mpi-interoperate.h``), or
+       ends Charm++ and gives ``CharmLibExit`` its code
+     - As in an ordinary run: does not return to its caller, and its
+       code is the exit status of every process
+   * - End
+     - ``CharmLibExit`` returns; the program calls ``MPI_Finalize``
+     - Charm++ calls ``MPI_Finalize`` on each process just before the
+       process exits
+
+The sections that follow describe library mode;
+:ref:`sec:mpiinterop_main` describes main mode. In both modes a
+``CkAbort`` ends the whole MPI job through ``MPI_Abort``, and both need
+MPI initialized with ``MPI_THREAD_SERIALIZED`` when a process has
+several PEs.
+
 Control Flow and Memory Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10766,13 +10800,62 @@ interface functions. One may look at
 on the way interfaces are defined, a library can be invoked multiple
 times. In the end, one should call ``CharmLibExit`` to free resources
 reserved by Charm++. ``CharmLibExit`` returns; the program can continue to
-use MPI afterwards and must call ``MPI_Finalize`` itself.
+use MPI afterwards and must call ``MPI_Finalize`` itself. Call
+``CharmLibInit`` and ``CharmLibExit`` once per process: Charm++ cannot be
+started again after ``CharmLibExit``, and a second call to either one
+prints a message and aborts.
+
+A complete Charm++ program with a mainchare can also run under an MPI
+``main``: link its main module without ``-nomain-module`` and do not
+include ``mpi-interoperate.h`` in its Charm++ source files, so that
+``CkExit`` keeps its ordinary meaning. The program then runs inside
+``CharmLibInit`` from the mainchare's constructor until it calls
+``CkExit(code)``, which ends Charm++ for good; ``CkExit`` returns to its
+caller in this mode. ``CharmLibExit`` returns ``int``: the code given to
+``CkExit``, the same value on every process, or 0 if the program never
+called the ordinary ``CkExit``. After ``CkExit`` in this mode, entry
+methods are discarded, but Converse-level work that is already scheduled
+(a thread that yields, timer callbacks) can still run until
+``CharmLibExit`` returns. A thread suspended waiting for a message or a
+future is not resumed. ``main`` can return the code after
+``MPI_Finalize``:
+
+.. code-block:: c++
+
+   int main(int argc, char **argv) {
+     int provided;
+     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+     CharmLibInit(MPI_COMM_WORLD, argc, argv); // runs until CkExit(code)
+     int code = CharmLibExit();
+     MPI_Finalize();
+     return code;
+   }
+
+``tests/charm++/mpi-interop/mpi_exitcode.cpp`` is a working example.
 
 Charm++ makes no progress while control is in MPI. Messages still queued
 when ``CkExit`` returns control to MPI stay queued and are delivered when
 Charm++ is next entered (``StartCharmScheduler`` in the next interface
 function call). For a clean boundary between phases, end a Charm++ phase
 with ``CkStartQD`` and call ``CkExit`` from the quiescence callback.
+
+The same holds for a blocking MPI call made from Charm++ code, such as
+an entry method, during a Charm++ phase. A Charm++ send or broadcast that has returned may still need
+communication progress, on the sending process and on the receiving
+processes, before the message is delivered. A PE blocked inside an MPI
+call makes no such progress. With one PE per process, entering a
+blocking MPI call right after sending or broadcasting messages
+(especially large ones), or while other processes are still sending to
+this one, can therefore stall the job: for example, an MPI collective
+never completes if the broadcast that tells the other processes to enter
+it has not left the process that is already blocked in it. With several
+PEs per process, the other PEs keep the blocked PE's messages moving only
+if they poll the same LCI device. With the default ``+lci_ndevices 1``
+they do. With ``+lci_ndevices`` equal to the number of PEs per process,
+each PE polls only its own device, so a PE blocked in an MPI call can
+stall the job just as with one PE per process. Work to complete sends
+without further progress in this situation is under way; until then, do
+not rely on it.
 
 Compilation and Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10813,6 +10896,69 @@ On HPE Slingshot (the CXI libfabric provider), export
 ``FI_CXI_RX_MATCH_MODE=hybrid`` in the job script. Reconverse sets it
 before LCI starts, but in an MPI program ``MPI_Init`` has already
 initialized libfabric, so that setting may come too late.
+
+.. _sec:mpiinterop_main:
+
+Main Mode: an Ordinary Charm++ Run inside an MPI Job
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A Charm++ program with a mainchare that calls MPI from its entry methods
+(directly or through an MPI-based library) can run unchanged inside an
+MPI job. Its ``main`` is
+
+.. code-block:: c++
+
+   #include <mpi.h>
+   #include "mpi-interoperate.h"
+
+   int main(int argc, char **argv) { return CharmMpiMain(argc, argv); }
+
+or the program has no ``main`` at all and is linked with
+``charmc -ld++ mpicxx -mpi-main``, which compiles this ``main`` at link
+time with the MPI compiler given to ``charmc`` (the Charm++ build itself
+has no MPI). With a ``main`` of its own, link with ``-nomain``.
+
+**int CharmMpiMain(int argc, char \**argv)**
+
+``CharmMpiMain`` calls ``MPI_Init_thread`` requesting
+``MPI_THREAD_SERIALIZED`` (if MPI is already initialized it keeps that
+initialization), starts Charm++ on every rank of ``MPI_COMM_WORLD`` as
+``CharmLibInit`` does, with Charm++ process *i* on rank *i*, and then
+runs the program as an ordinary Charm++ run. It does not return.
+``CkExit(code)`` behaves as in any Charm++ program: it does not return to
+its caller, and every process exits with ``code`` after Charm++ has
+called ``MPI_Finalize`` on the thread that called ``CharmMpiMain``. The
+Charm++ source files need no change. The source files of chares must not
+include ``mpi-interoperate.h``: it redefines ``CkExit`` to the library
+mode function that returns to its caller. Only the file with ``main``
+includes it.
+
+If a process has several PEs and MPI provides a thread level below
+``MPI_THREAD_SERIALIZED``, the run aborts at startup. With
+``MPI_THREAD_SERIALIZED``, at most one PE of a process may be inside an
+MPI call at a time; this holds, for example, when the MPI calls are made
+from nodegroup entry methods that carry the ``[exclusive]`` attribute,
+or from the entry methods of a single chare per process.
+
+A Charm++ send or broadcast that has returned may still need
+communication progress, on the sending process and on the receiving
+processes, before the message is delivered. A PE blocked inside an MPI
+call makes no such progress. With one PE per process, entering a
+blocking MPI call right after sending or broadcasting messages
+(especially large ones), or while other processes are still sending to
+this one, can therefore stall the job: for example, an MPI collective
+never completes if the broadcast that tells the other processes to enter
+it has not left the process that is already blocked in it. With several
+PEs per process, the other PEs keep the blocked PE's messages moving only
+if they poll the same LCI device. With the default ``+lci_ndevices 1``
+they do. With ``+lci_ndevices`` equal to the number of PEs per process,
+each PE polls only its own device, so a PE blocked in an MPI call can
+stall the job just as with one PE per process. Work to complete sends
+without further progress in this situation is under way; until then, do
+not rely on it.
+
+``tests/charm++/mpi-interop`` has a working example (``exitcode.C`` with
+``mpi_main.cpp``, and the same program linked with ``-mpi-main``).
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~

@@ -137,6 +137,7 @@ PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
 MPI_INTEROPERATE=""
+MPI_MAIN=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
@@ -173,7 +174,7 @@ printUsage() {
     echo "        -f90 <new f90> -f90-option <opt> -fmoddir <f90mod path>"
     echo "        -flibs -rpath <path> -custom-part -touch-on-failure"
     echo "        -mpi -openmp -no-trace-mpi -build-shared -charm-shared"
-    echo "        -no-charmrun -no-preprocess-ci -nomain-module -nomain"
+    echo "        -no-charmrun -no-preprocess-ci -nomain-module -nomain -mpi-main"
     echo "        -nof90main -f90main"
     echo
     echo "  Charmc compiles C, C++, f77, f90, AMPI, Converse, Converse++, Charm, "
@@ -202,6 +203,10 @@ End() {
 	if [[ -z "$SKIP_MODULEINIT" && -n "$modInitObj" ]]
 	then
 	    DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
+	fi
+	if [[ -n "$MPI_MAIN" && -n "$mpiMainObj" ]]
+	then
+	    DoNoErrCheck $RM "$mpiMainObj" > /dev/null 2>&1
 	fi
     fi
     exit $1
@@ -906,6 +911,10 @@ do
 		;;
 	-mpi)
 		MPI_INTEROPERATE="yes"
+		NO_MAIN="yes"
+		;;
+	-mpi-main)
+		MPI_MAIN="yes"
 		NO_MAIN="yes"
 		;;
 	-nomain-module)
@@ -1616,6 +1625,8 @@ esac
 modInitName="moduleinit$$"
 modInitSrc="$modInitName.C"
 modInitObj="$modInitName.o"
+# -mpi-main: main() is compiled at link time from include/mpi-main.C.
+mpiMainObj="mpimain$$.o"
 
 
 ##############################################################################
@@ -1740,6 +1751,8 @@ if [[ "$BUILD_SHARE" != '1' && "$USER_INITIATED_SHARED" != '1' && -z "$SKIP_MODU
 then
   ALL_LIBS=("$modInitObj" "${ALL_LIBS[@]}")
 fi
+
+[[ -n "$MPI_MAIN" ]] && ALL_LIBS=("$mpiMainObj" "${ALL_LIBS[@]}")
 
 ALL_LIBS=("${OBJECTFILES[@]}" "${ALL_LIBS[@]}")
 
@@ -2274,6 +2287,14 @@ then
     runCmd $CHARM_CXX "${CHARM_CXX_FLAGS[@]}" -c "$modInitSrc" -o "$modInitObj"
 fi
 
+# The Charm++ build has no MPI, so main() for -mpi-main is compiled here, with
+# the link compiler, which must be the MPI C++ compiler (-ld++ mpicxx).
+if [[ -n "$MPI_MAIN" ]]
+then
+    DoNoErrCheck $CHARM_LDXX "${CHARM_CXX_FLAGS[@]}" -c "$CHARMINC/mpi-main.C" -o "$mpiMainObj" \
+        || Abort "-mpi-main: the link compiler ($CHARM_LDXX) could not compile $CHARMINC/mpi-main.C, which includes mpi.h. The link compiler must be an MPI C++ compiler wrapper: give one with -ld++, for example -ld++ mpicxx."
+fi
+
 ###############################################################################
 #
 #                               Finally, LINK
@@ -2328,5 +2349,6 @@ then
 fi
 
 [[ -z "$SKIP_MODULEINIT" && -z "$SAVE" ]] && DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
+[[ -n "$MPI_MAIN" && -z "$SAVE" ]] && DoNoErrCheck $RM "$mpiMainObj" > /dev/null 2>&1
 
 Copyobj

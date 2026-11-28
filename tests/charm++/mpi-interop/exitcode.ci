@@ -1,0 +1,28 @@
+mainmodule exitcode {
+  readonly CProxy_ExitMain exitMain;
+  readonly CProxy_ExitGroup exitGroup;
+  readonly int exitNumElems;
+  readonly CProxy_ExitNode exitNode;
+
+  mainchare ExitMain {
+    entry ExitMain(CkArgMsg *m);
+    entry [reductiontarget] void done(long sum);
+    entry void mpiDone(int sum);
+  };
+
+  array [1D] ExitElem {
+    entry ExitElem();
+    entry void work();
+  };
+
+  group ExitGroup {
+    entry ExitGroup();
+    entry void finish(int code);
+    entry void abortHere();
+  };
+
+  nodegroup ExitNode {
+    entry ExitNode();
+    entry void allreduce();
+  };
+};

@@ -25,12 +25,20 @@ void CharmLibInitWorld(int argc, char **argv);
 int CharmInteropPickRendezvous(char *host, int hostlen);
 void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
                           const char *host, int port, int argc, char **argv);
+void CharmInteropSetTcpBootstrap(int rank, int size, int local_rank,
+                                 int local_size, const char *host, int port);
+int CharmMpiMainStart(int rank, int size, int serialized, const char *userPmi,
+                      int argc, char **argv);
 
 void CharmBeginInit(int argc, char** argv);
 void CharmFinishInit();
 void CharmInit(int argc, char** argv);
 
-void CharmLibExit();
+// Returns the exit code the application gave to CkExit, the same on every
+// process; 0 if the exit was started by CharmLibExit itself. After
+// CharmLibInit, call it once per process: a second CharmLibExit, or a
+// CharmLibInit after it, prints a message and aborts.
+int CharmLibExit();
 
 void LibCkExit(void);
 
@@ -42,7 +50,8 @@ void StopCharmScheduler();
 #endif
 
 #if CMK_INTEROP_HAVE_MPI_H
-// CharmLibInit's abort hook (CmiSetAbortHook): a CkAbort or CmiAbort in any
+// The abort hook of CharmLibInit and CharmMpiMain (CmiSetAbortHook): a
+// CkAbort or CmiAbort in any
 // process ends the whole MPI job. Without it an abort ends only its own
 // process, because LCI is bootstrapped over LCT's tcp backend, whose
 // process-manager abort reaches no other. CmiAbort has already printed msg;
@@ -56,22 +65,23 @@ static inline void CharmInteropAbortHook(int code, const char *msg) {
   int finalized = 0;
   MPI_Finalized(&finalized);
   if (finalized) return;
-  fprintf(stderr, "CharmLibInit: ending the MPI job with MPI_Abort(MPI_COMM_WORLD, %d)\n",
+  fprintf(stderr, "MPI interop: ending the MPI job with MPI_Abort(MPI_COMM_WORLD, %d)\n",
           code);
   fflush(stderr);
   MPI_Abort(MPI_COMM_WORLD, code);
 }
 
-// Starts Charm++ inside an MPI program. Charm++ runs on every rank of the job:
-// userComm must be MPI_COMM_WORLD or congruent to it, and Charm++ process i is
-// MPI_COMM_WORLD rank i. After CharmLibExit returns the program may keep
-// using MPI and must call MPI_Finalize itself. With several PEs per process,
-// initialize MPI with MPI_Init_thread(..., MPI_THREAD_SERIALIZED, ...): an
-// abort on a PE calls MPI_Abort from a thread MPI did not create, while the
-// main thread, inside Charm++, makes no MPI call.
-static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
+// The part of an MPI interop start that needs MPI, shared by CharmLibInit and
+// CharmMpiMain (who names the caller in messages): checks that userComm is
+// MPI_COMM_WORLD or congruent to it, selects LCT's tcp bootstrap for LCI with
+// the rendezvous at rank 0, so the launcher's PMI is left to MPI, and
+// registers the abort hook. Returns this process's rank and the number of
+// ranks, and in userPmi the LCT_PMI_BACKEND the user had set ("" if none).
+static inline void CharmInteropBootstrap(MPI_Comm userComm, const char *who,
+                                         int *rankOut, int *sizeOut,
+                                         char *userPmi, int userPmiLen) {
 #if defined(_WIN32)
-  fprintf(stderr, "CharmLibInit: MPI interop is not supported on Windows\n");
+  fprintf(stderr, "%s: MPI interop is not supported on Windows\n", who);
   fflush(stderr);
   MPI_Abort(MPI_COMM_WORLD, 1);
 #endif
@@ -81,10 +91,10 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   MPI_Comm_compare(userComm, MPI_COMM_WORLD, &cmp);
   if (cmp != MPI_IDENT && cmp != MPI_CONGRUENT) {
     fprintf(stderr,
-            "CharmLibInit (rank %d): the communicator must be MPI_COMM_WORLD "
+            "%s (rank %d): the communicator must be MPI_COMM_WORLD "
             "or congruent to it. Charm++ on reconverse runs on every rank of "
             "the job; running it on a subset of ranks (a split communicator) "
-            "is not supported.\n", rank);
+            "is not supported.\n", who, rank);
     fflush(stderr);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
@@ -99,17 +109,16 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
       if (val == NULL) continue;
       if (atoi(val) > 1) {
         fprintf(stderr,
-                "Warning: CharmLibInit: MPI_COMM_WORLD has 1 rank, but %s=%s: "
+                "Warning: %s: MPI_COMM_WORLD has 1 rank, but %s=%s: "
                 "the launcher may have started %s processes, each its own MPI "
                 "job. Launch with the launcher your MPI requires (for Cray "
-                "MPICH under Slurm, srun --mpi=cray_shasta).\n", var, val, val);
+                "MPICH under Slurm, srun --mpi=cray_shasta).\n", who, var, val,
+                val);
         fflush(stderr);
       }
       break;
     }
   }
-  // Bootstrap LCI over LCT's tcp backend, rendezvous at rank 0, so the
-  // launcher's PMI is left to MPI.
   char host[256] = {0};
   int port = -1;
   if (rank == 0) port = CharmInteropPickRendezvous(host, sizeof(host));
@@ -117,7 +126,7 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   MPI_Bcast(host, sizeof(host), MPI_CHAR, 0, MPI_COMM_WORLD);
   if (port < 0) {
     if (rank == 0)
-      fprintf(stderr, "CharmLibInit: no TCP port for the LCI bootstrap\n");
+      fprintf(stderr, "%s: no TCP port for the LCI bootstrap\n", who);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
   MPI_Comm local;
@@ -127,15 +136,32 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   MPI_Comm_rank(local, &local_rank);
   MPI_Comm_size(local, &local_size);
   MPI_Comm_free(&local);
-  // Read before CharmLibInitWorldTcp, which sets the variable when it is unset.
-  char userPmi[32] = "";
+  // Read before CharmInteropSetTcpBootstrap, which sets the variable when it
+  // is unset.
+  userPmi[0] = '\0';
   if (const char *p = getenv("LCT_PMI_BACKEND"))
-    snprintf(userPmi, sizeof(userPmi), "%s", p);
+    snprintf(userPmi, userPmiLen, "%s", p);
   // Before Charm++ starts, so that an abort during startup ends the job too.
-  // CharmLibExit removes it.
   CmiSetAbortHook(CharmInteropAbortHook);
-  CharmLibInitWorldTcp(rank, size, local_rank, local_size, host, port, argc,
-                       argv);
+  CharmInteropSetTcpBootstrap(rank, size, local_rank, local_size, host, port);
+  *rankOut = rank;
+  *sizeOut = size;
+}
+
+// Library mode: starts Charm++ inside an MPI program. Charm++ runs on every
+// rank of the job: userComm must be MPI_COMM_WORLD or congruent to it, and
+// Charm++ process i is MPI_COMM_WORLD rank i. After CharmLibExit returns the
+// program may keep using MPI and must call MPI_Finalize itself. With several
+// PEs per process, initialize MPI with
+// MPI_Init_thread(..., MPI_THREAD_SERIALIZED, ...): an abort on a PE calls
+// MPI_Abort from a thread MPI did not create, while the main thread, inside
+// Charm++, makes no MPI call. CharmLibExit removes the abort hook.
+static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
+  int rank = -1, size = 0;
+  char userPmi[32] = "";
+  CharmInteropBootstrap(userComm, "CharmLibInit", &rank, &size, userPmi,
+                        sizeof(userPmi));
+  CharmLibInitWorld(argc, argv);
   if (CmiMyNode() != rank || CmiNumNodes() != size) {
     fprintf(stderr,
             "CharmLibInit: Charm++ process %d of %d is MPI_COMM_WORLD rank %d "
@@ -150,6 +176,49 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
     fflush(stderr);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
+}
+
+// CharmMpiMain's exit hook (CmiSetExitHook): the runtime calls it once per
+// process, on the thread that called CharmMpiMain, after the exit sequence
+// and immediately before exit(code).
+static inline void CharmInteropExitHook(int code) {
+  (void)code;
+  int finalized = 0, isMain = 1;
+  MPI_Finalized(&finalized);
+  if (finalized) return;
+  MPI_Is_thread_main(&isMain);
+  if (!isMain) {
+    fprintf(stderr, "Warning: CharmMpiMain: MPI_Finalize is called on a thread "
+            "other than the one that initialized MPI\n");
+    fflush(stderr);
+  }
+  MPI_Finalize();
+}
+
+// Main mode: runs a Charm++ program with a mainchare inside an MPI job as an
+// ordinary Charm++ run. Call it from main, on every rank, as
+// "return CharmMpiMain(argc, argv);" (charmc -mpi-main supplies such a main).
+// It initializes MPI with MPI_THREAD_SERIALIZED unless MPI is already
+// initialized, starts Charm++ on every rank of MPI_COMM_WORLD with Charm++
+// process i being rank i, and does not return: CkExit(code) ends the program
+// as in any Charm++ run, MPI_Finalize is called on this thread just before
+// each process exits with code, and a CkAbort ends the job through
+// MPI_Abort. With several PEs per process the run aborts at startup if MPI
+// provides less than MPI_THREAD_SERIALIZED.
+static inline int CharmMpiMain(int argc, char **argv) {
+  int initialized = 0, provided = MPI_THREAD_SINGLE;
+  MPI_Initialized(&initialized);
+  if (initialized)
+    MPI_Query_thread(&provided);
+  else
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+  int rank = -1, size = 0;
+  char userPmi[32] = "";
+  CharmInteropBootstrap(MPI_COMM_WORLD, "CharmMpiMain", &rank, &size, userPmi,
+                        sizeof(userPmi));
+  CmiSetExitHook(CharmInteropExitHook);
+  return CharmMpiMainStart(rank, size, provided >= MPI_THREAD_SERIALIZED,
+                           userPmi, argc, argv);
 }
 #endif
 
