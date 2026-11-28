@@ -47,6 +47,13 @@ Revised 2026-11-27, after review of reconverse#343: a destroy is safe once a rou
 origin's *puts* counted toward has *fired*; for *puts* without a counter, origins detach with a completion
 callback and send the owner their message from it (3.2, 10.1, 10.2).
 
+Revised 2026-11-27, after Aditya's review of #4323: the migration protocol (10.3) closes every process
+that can contribute to the moving object's counters, counts per counter as 10.2 does, holds a move while
+a fired round's message waits, reads a staged *put* wherever its announcement finds the owner, and has
+rules for *gets* and signals during a move; a staged *put* needs no credit (4.9); a move costs four
+messages per attached process; migration needs one call in the owner's PUP (10.5); open question 14 is
+answered: a forwarded hop is not expedited on recharm.
+
 ## In brief: the calls added, kept and removed
 
 The receiver, called the **owner**, registers a buffer once (a **region**) and an atomic count with an
@@ -165,11 +172,11 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
   may cost round trips; a round may not.
 - **W3 targets travel in ordinary messages.** A target is a small value that can be PUP'd into any entry
   method. Setup needs no special protocol beyond that.
-- **W4 the runtime holds *puts* to an owner that migrates.** Before an owner moves, every attached
-  process acknowledges a closing, and a *put* made during the move waits at its origin until the owner
-  reads it at its new home (10.3). This holds at load balancing and at any other time, and the
-  application exchanges nothing again. No *put* is forwarded through the old home. Restart after a disk
-  checkpoint, and a change of partners, remain the application's to handle (10.3).
+- **W4 the runtime holds *puts* to an owner that migrates.** Before an owner moves, every attached process
+  acknowledges a closing, and a *put* made during the move is staged at its origin, its source released at
+  once, and read by the owner where its announcement finds it (10.3). This holds at load balancing and at
+  any other time, and the application exchanges nothing again. No *put* is forwarded through the old home.
+  Restart after a disk checkpoint, and a change of partners, remain the application's to handle (10.3).
 - **W5 strided arrays use layout descriptors; PUP-style packing is for pointer-based data**.
   Variable-size contributions are a special case to support (section 4.6).
 - **W6 the counter of G2 is one atomic 32-bit word** that origins in every locality update (section
@@ -589,6 +596,11 @@ message: it lands when it arrives, whatever the owner is executing.
      `CmiSignal` on the producer's credit target. `CmiSignal` is a contribution with no data.
    - The producer issues its next *put* only after its credit counter *fires*. Until then it keeps the data
      itself. `CkChannel` (section 13) does this queuing for the application.
+   - While the consumer moves, the producer does not wait for the credit: a *put* through a target whose
+     owner is moving is staged without a credit (10.3, step 4). The owner's read of it takes the buffer as
+     a direct *put* would, and the credit is debited when that read completes, so the two pair off.
+     `CkChannel` does this (`onStagedDone`), and it keeps the credit and the move off the producer's
+     critical path.
    - The application still decides when the buffer is free, so W1 holds. The runtime only carries the
      signal and holds no *put* of its own accord.
    - Cost: one small transfer per round. The release credit of the device channels measured 0.5 us to
@@ -765,8 +777,9 @@ The contribution that took the word to zero *fires*:
       `+lci_ndevices 2`, in which each handler checks a sequence number at both ends of the payload,
       caught signals that arrived before their data, on one node and on two. The 2,000-*put* runs
       passed, as Aditya's checksums had.
-    - So reconverse asks LCI for network completion (`comp_semantic(network)`) on every emulated put
-      with signal. LCI then does not send the write inline, and sends the signal only after the write's
+    - So reconverse asks LCI for network completion (`comp_semantic(network)`) on every emulated put with
+      signal (reconverse main since #342, merged as 50612f1; charm's reconverse pin, 09725a5, does not
+      include it yet). LCI then does not send the write inline, and sends the signal only after the write's
       delivery completion, at every size. The same stress tests pass.
   - On cxi without native `fi_writedata`, G1's "one *put* and one notification" is two network
     operations. Median one-way latency on Delta, two nodes, Release build:
@@ -778,12 +791,14 @@ The contribution that took the word to zero *fires*:
     | 8 KiB | 9.6 us | 9.7 us |
     | 64 KiB | 10.9 us | 11.2 us |
 
-    A message wins by about 5 us up to 1 KiB; from 8 KiB, where the message leaves LCI's eager
-    protocol, the two are level. So a *put* of at most `+put_message_max_bytes` travels as one message
-    that carries its data and its signal, and the owner's handler copies the data into the piece. The
-    default is LCI's eager limit (about 8 KiB) where LCI emulates the signal, and 0 where the network
-    writes with immediate data. On Anvil's ibv the native put with signal was level with a message at
-    8 bytes and faster above (4.75 against 4.62 us at 8 B, 5.67 against 7.82 us at 8 KiB, Debug build).
+    A message wins by about 5 us up to 1 KiB; from 8 KiB, where the message leaves LCI's eager protocol, the
+    two are level. So a *put* of at most `+put_message_max_bytes` travels as one message that carries its
+    data and its signal, and the owner's handler copies the data into the piece. The default is LCI's eager
+    limit (about 8 KiB) where LCI emulates the signal, and 0 where the network writes with immediate data.
+    For those sizes a round costs one handler on the owner PE per contribution, which copies and
+    *decrements* (W7), not the one scheduler entry per round of G2: the owner PE pays that work to save each
+    origin about 5 us. On Anvil's ibv the native put with signal was level with a message at 8 bytes and
+    faster above (4.75 against 4.62 us at 8 B, 5.67 against 7.82 us at 8 KiB, Debug build).
   - For device memory, see 8.4.
 
 ### 5.5 Signal encoding
@@ -1187,14 +1202,16 @@ the same id-block code would serve them.
 Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
 - **No message order.** No step of setup or teardown may rely on two messages arriving in order. His
   migration protocol had six such holes, and each one hung leanmd.
-- **Urgent queue.** Setup, teardown, registration, detach request and detach notice messages go through reconverse's urgent
-  queue (`CmiSyncSendAndFreeUrgent`, reconverse#339), and so do the migration messages of 10.3. In leanmd,
-  ordinary messages waited 50-400 ms per hop behind deep scheduler queues. A message for an entry method
-  avoids that queue only if the entry method is `[expedited]`. An ordinary entry method's message passes
-  through `_skipCldHandler` into `CsdSchedQueue`, behind the entry methods already waiting there, even
-  when it was taken from the urgent queue. An expedited one keeps the entry method's own handler, and
-  reconverse's default scheduler drains its thread queue at every iteration before it takes the next message
-  from `CsdSchedQueue`, so the message waits only for the entry method that is running. The location
+- **Urgent queue.** Setup, teardown, registration, detach request and detach notice messages go through
+  reconverse's urgent queue (`CmiSyncSendAndFreeUrgent`, reconverse#339), and so do the migration messages
+  of 10.3. In leanmd, ordinary messages waited 50-400 ms per hop behind deep scheduler queues. A message for
+  an entry method avoids that queue only if the entry method is `[expedited]`. An ordinary entry method's
+  message passes through `_skipCldHandler` into `CsdSchedQueue`, behind the entry methods already waiting
+  there, even when it was taken from the urgent queue. An expedited one keeps Charm++'s message handler
+  (`_charmHandlerIdx`) instead of being given `_skipCldHandler`, and reconverse's default scheduler drains
+  its thread queue at every iteration before it takes the next message from `CsdSchedQueue`, so the message
+  waits only for the entry method that is running. On recharm this holds only for the first hop: a message
+  the location manager forwards or re-sends goes without the option (open question 14). The location
   manager's own messages (`requestLocation`, `updateLocation`, `immigrate`) are expedited for this reason.
 
 ### 10.3 Migration and other events that invalidate targets
@@ -1202,38 +1219,71 @@ Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
 The runtime holds the *puts* to an owner that migrates, with the protocol of the device channels
 (`CkChannel`, #4312; Appendix A.4.9), so a migration needs no teardown or setup by the application (W4).
 The protocol was built for one origin per channel with a release credit. A region has no credit (W1) and
-a counter may have many origins, so three parts of it change for the family: what the acknowledgement
-carries (step 2), how messages reach the owner (step 5), and which processes are closed (step 1).
+a counter may have many origins, so parts of it change for the family: which processes are closed
+(step 1), what the acknowledgement carries and what the owner counts (steps 2 and 3), where a staged *put*
+is read and what happens to *gets* and signals during a move (step 4), and how messages reach the owner
+(step 5).
 
 **The protocol.**
 
-1. **Closing.** Before an owner object leaves, its process sends a closing for each region it owns to
-   every process on that region's attachment list (10.1), not only to one origin. Each of those processes
-   may hold *puts* from several origin objects.
-2. **Acknowledgement.** Each closed process acknowledges once none of its *puts* into the region, and none
-   of its *gets* from it, is in flight. The acknowledgement carries the number of *puts* the process has
-   sent into the region since it *attached*. `CkChannel`'s acknowledgement names the sender's last *put*
-   by its sequence number instead, which works only because the credit allows one *put* in flight per
-   channel.
-3. **The move.** The owner keeps a count of the *puts* that have landed in each region, and moves once
-   every attached process has acknowledged and that count has reached the sum of the acknowledged counts.
-   Data that landed in a round that has not *fired* yet is in the region's memory, and the counter's
-   value and action travel with the object's PUP. `CkChannel::unseenBytes()` tells the owner's PUP how
-   much of the buffer such data occupies, so the PUP can carry only that.
-4. **Puts during the move.** A *put* made in a closed process does not go to the old home. The origin's
-   process copies the source into a staging buffer on the producing stream, releases the source once that
-   copy has read it, and announces the staged *put* to the owner object at once. The location manager
-   holds the announcement until the owner arrives, and the owner reads the staged *puts* at its new home,
-   in order (announce-then-read, 8.2), before later *puts* go to it directly. The origin object does not
-   move until its staged *puts* have been read.
+1. **Closing.** Before an owner object leaves, its process closes everything that can contribute to the
+   object's counters or land in its regions, not only one origin. It sends a closing to every process on
+   the attachment list (10.1) of each region the object owns and of each of its counters' counter-only
+   targets, which have attachment lists of their own (a `CkSignal` in flight would otherwise *decrement*
+   the old process's slot after the counter left). Origins in the owner's own process are closed too:
+   their device *puts* land on a stream and can be in flight. Each closed process may hold *puts* from
+   several origin objects.
+2. **Acknowledgement.** Each closed process acknowledges once none of its *puts* or signals to the
+   object, and none of its *gets* from it, is in flight. The acknowledgement carries what a detach notice
+   carries (10.2): per counter, the contributions the process has made to it since it *attached*
+   (a batch of k same-host device *puts* has weight k), and per region its *puts* without a counter.
+   `CkChannel`'s acknowledgement names the sender's last *put* by its sequence number instead, which
+   works only because the credit allows one *put* in flight per channel.
+3. **The move.** The owner counts what has landed as 10.2 does, per counter and in contributions (the sum
+   of N over the rounds armed, minus the counter's value), and per region for *puts* without a counter. A
+   *put* with signal names only its counter (5.5), so a count of *puts* per region is not available. The
+   owner moves once every closed process has acknowledged and, for each of its counters and regions,
+   the landed count has reached the sum the acknowledgements report. For those sums to be complete in
+   Charm++, a target's region and counter must have the same owner **object**; 3.2's "same owner PE" is
+   not enough, since a counter shared with another object's region would not move with it. The
+   shared-counter rule of 10.2 cannot help here: the application chooses when to destroy, but a move can
+   come at any time.
+   - The owner also does not move while a round has *fired* and its counter's message has not been
+     handled. That message waits in the old PE's queue, for example behind the entry method that packs
+     the object, and its handler calls the owner's entry method directly (5.3). The move waits for that
+     handler, as `CkChannel` holds a move for a read in flight, and the old counter slot stays reserved
+     until its message has been handled, as a destroy's withheld index does (10.2).
+   - Data that landed in a round that has not *fired* yet is in the region's memory, and the counter's
+     value and action travel with the object's PUP. `CkChannel::unseenBytes()` tells the owner's PUP how
+     much of the buffer such data occupies, so the PUP can carry only that.
+4. **Transfers during the move.** A *put* made in a closed process does not go to the old home. The
+   origin's process copies the source into a staging buffer on the producing stream, releases the source
+   once that copy has read it, and announces the staged *put* to the owner object at once, with no release
+   credit (4.9, pattern 3).
+   - The owner reads a staged *put* where the announcement finds it: at its old home if it has not left,
+     at its new home if it has, the location manager forwarding the announcement in the second case. The
+     read holds the owner in place until it completes, as `CkChannel`'s does (`onAnnounce` starts the
+     read without checking for a closing). If the owner were read only at its new home, two objects that
+     *put* to each other and move in the same round would each wait for the other, since an origin
+     object does not move until its staged *puts* have been read.
+   - Staged *puts* are read in order (announce-then-read, 8.2), before later *puts* go to the owner
+     directly.
+   - A *put* is held at its origin, with its source in use, only when staging cannot allocate; it then
+     waits until the owner is resolved, as in `CkChannel`.
+   - A `CkSignal` made in a closed process is a contribution with no data: it travels as a staged
+     announcement with nothing to read, which the owner applies as a *decrement*.
+   - A `CkGet` made in a closed process waits until the owner answers the *attach* at its new home, since
+     the region's memory is in transit. `CkChannel` has no *get*, so its protocol had no rule for this.
 5. **Reaching the new home.** A target names its owner by process rank and counter index, which a move
    makes stale. So the attachment also records the owner's object id, and the messages that must find
    the owner (the *attach* and the staged announcements) are sent to that object through the location
    manager. In `CkChannel` they go to the element's entry method `ckDeviceChannelControl`; the closing,
    its acknowledgement, the resolution, the credit and the read's completion are Converse messages to a
    known PE.
-6. **At the new home.** The owner's PUP registers each region again on its new memory (as
-   `CkChannel::reopen(new_dst)` does), and each origin's next *put* or *attach* finds it there.
+6. **At the new home.** In the owner's PUP routine, after unpacking a buffer that a region names, the
+   application binds the region to it again, one call per region (as `CkChannel` users call
+   `reopen(new_dst)` in their `pup`); a region the runtime allocated needs nothing. Each origin's next
+   *put* or *attach* finds the owner there.
 
 No step may depend on the order in which two messages arrive (Appendix A.4.4); `CkChannel` numbers its
 closings and resolutions with epochs and generations for this. The messages go through the urgent queue
@@ -1241,7 +1291,9 @@ closings and resolutions with epochs and generations for this. The messages go t
 include reconverse#339. The *attach* and the staged announcements go to the element's entry method
 `ckDeviceChannelControl`, which is not `[expedited]` (ckarray.ci), and the channel sends to it through a
 callback with no options, so they wait behind the queued entry methods. Declaring that entry method
-`[expedited]` and sending with `CK_MSG_EXPEDITED` removes the wait (open question 14).
+`[expedited]` and sending with `CK_MSG_EXPEDITED` removes the wait on the first hop only; a staged
+announcement is sent while the owner moves, so its forwarded hop must keep the option too (open question
+14).
 
 **An origin that migrates** does not move while one of its *puts* is in flight, as in `CkChannel`. It
 carries its targets and *attaches* again at its first *put* after it arrives. Its old process stays
@@ -1253,9 +1305,10 @@ its value and action are PUP'd, and since no *put* is in flight, none of its con
   sending object's hold count, and records a sequence number: tens of nanoseconds against a *put* of
   1-3 us. leanmd 16x8x8 without load balancing ran 2571.6 ms per step with channels against 2587.5 with
   zero copy (one pair of runs, 2026-10-20; to be repeated, section 14).
-- *Per move.* A closing and an acknowledgement per attached process, and an *attach* at each origin's
-  next *put*: about three messages per attached process, done in parallel across neighbors, plus a copy
-  and a read for each *put* staged during the move. A teardown and setup by hand cost about the same.
+- *Per move.* Four messages per attached process: a closing, an acknowledgement, the *attach* at the
+  origin's next *put*, and its answer (`CkChannel` sends the same four: closing, ack, resolve,
+  resolution). They run in parallel across neighbors, plus a copy and a read for each *put* staged during
+  the move. A teardown and setup by hand cost about the same.
 - *Break-even.* If a round saves s per contribution and a move costs S per attached process, the
   persistent family pays when objects stay in place for more than S/s rounds. For s, Aditya measured
   3-10 us for device *puts* against `nocopydevice`. S is measured in phase 4; `CkChannel` with
@@ -1303,11 +1356,12 @@ The runtime handles migration (10.3). What is left to the application:
 
 ### 10.5 Advice for the manual
 
-"Use the persistent family when an object exchanges data with the same partners for many rounds.
-Migration needs nothing from you: the runtime holds *puts* to an object while it moves, at load balancing
-or at any other time. A move costs a few messages per partner process, so objects that move at nearly
-every step gain less. When partners change, as after mesh refinement, destroy the old regions and send
-new targets. Readiness is your responsibility: follow one of the patterns in 4.9."
+"Use the persistent family when an object exchanges data with the same partners for many rounds. Migration
+needs one call from you: in your PUP routine, after unpacking a buffer that a region names, bind the region
+to it again; regions the runtime allocated need nothing. The runtime holds *puts* to an object while it
+moves, at load balancing or at any other time. A move costs a few messages per partner process, so objects
+that move at nearly every step gain less. When partners change, as after mesh refinement, destroy the old
+regions and send new targets. Readiness is your responsibility: follow one of the patterns in 4.9."
 
 ## 11. Error checking
 
@@ -1744,11 +1798,20 @@ Each phase is a PR with tests; measurements gate the next phase.
     keeps a mapping and a registration until then.
 14. Messages that must find a moving owner (10.3, step 5): the *attach* and the staged announcements go
     to an entry method of the owner so that the location manager can forward them. Proposed: make that
-    entry method `[expedited]` and send with `CK_MSG_EXPEDITED` (10.2), which needs no new mechanism.
-    To check: the envelope does not record the option, so when the location manager forwards such a
-    message to the owner's new PE, does the forwarded hop stay expedited? Measure with the deep-queue
-    test (chantest `-d 100` and `-d 400`, `CHARM_CHANNEL_STATS`): how long attaches and staged *puts*
-    wait, before and after.
+    entry method `[expedited]` and send with `CK_MSG_EXPEDITED` (10.2).
+    - Checked (Aditya, review of #4323): on recharm a forwarded hop does not stay expedited.
+      `CkArray::deliver` calls `recvMsg` with the default options 0 (ckarray.h), `recvMsg` forwards with
+      those options, and what the location manager buffered while the element was in transit is re-sent
+      with none (`sendBufferedMsgs`, `releaseRetiredMsgs`). A staged announcement is sent while the owner
+      moves, so it would lose the option on exactly the hop that counts.
+    - So the option must travel with the message: record it in the envelope (its attributes have one
+      spare bit) when the array message is first sent, and put it back into the options wherever the
+      location manager forwards or re-sends the message. A re-send by the application starts again from
+      its own options. Then `[expedited]` on `ckDeviceChannelControl`, and `CK_MSG_EXPEDITED` on the
+      *attach* and the announcements only when control goes to that entry method, not when it falls back
+      to the application's `arrived` callback.
+    - Measure with the deep-queue test (chantest `-d 100` and `-d 400`, `CHARM_CHANNEL_STATS`): how long
+      attaches and staged *puts* wait, before and after.
 
 ## 17. Existing applications (G6)
 
@@ -2059,7 +2122,8 @@ segfaults and handlers run with the wrong index.
 
 Aditya patched LCI on Delta. The patched build is under his home directory there; the branch shows no upstream LCI change.
 
-Phase 1 fixes it in reconverse: LCI's allocator returns a shared empty buffer for 0 bytes
+Phase 1 (reconverse#342, merged into reconverse main as 50612f1; charm's reconverse pin, 09725a5, does
+not include it yet) fixes it: LCI's allocator returns a shared empty buffer for 0 bytes
 (`AllocatorLCI::allocate`, comm_backend_lci.h). No "CmiAlloc: size <= 0" appeared in its Delta runs.
 
 #### A.4.4 Messages between two PEs are not delivered in order
@@ -2126,7 +2190,7 @@ first W4 (tear down and rebuild at AtSync) avoided that protocol. However, the G
 same branch (`+LBAsync`) moves elements while their neighbors keep stepping, with no AtSync, and regions owned by
 those elements need a hold on *puts* that the application cannot provide without runtime help.
 
-The family now adopts his protocol, with three changes, for every migration (W4, 10.3). In a program with nothing
+The family now adopts his protocol, with the changes 10.3 lists, for every migration (W4). In a program with nothing
 moving it costs tens of nanoseconds per *put*. With *puts* batched (A.4.6), leanmd 16x8x8 without load balancing ran
 2571.6 ms per step with channels against 2587.5 with zero copy (one pair of runs); the earlier gap there came from the
 unbatched copies, not from the protocol. Its ordering holes are fixed in the merged `CkChannel` (#4312).
