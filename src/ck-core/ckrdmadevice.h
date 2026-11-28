@@ -108,12 +108,20 @@ extern "C" {
   extern int device_ack_handler;
 }
 
-// Device pool: arenas registered lazily, whole, on first network use.
-// Every other device buffer is registered per message and released on
-// completion; holding registrations across messages is the network layer's
-// registration cache to do.
+// Device pool (hapiDevPool* in hapi.h): segments registered lazily, whole, on
+// first network use. Every other device buffer is registered per message and
+// released on completion; holding registrations across messages is the
+// network layer's registration cache to do. Allocation and free are host-side
+// bookkeeping; a free does not wait for device work on the block, so a block
+// still being read must not be freed (or must go through hapiFreeAsync).
 void* CkDeviceMalloc(size_t size);
+// The same, but nullptr instead of growing the pool when nothing fits: what
+// the migration admission check reserves with (cklocation.C).
+void* CkDeviceMallocNoGrow(size_t size);
 void CkDeviceFree(void* ptr);
+// +gpupool: the pool is the runtime's allocation policy (hapiMalloc, migration
+// payloads and receive arenas come from it).
+bool CkDevicePoolOn();
 // Per-PE init of the device zerocopy path (idle-time ack flush, options).
 void CkRdmaDeviceInit(char** argv);
 // Called on each PE when its exit sequence reaches ConverseExit: after it, a

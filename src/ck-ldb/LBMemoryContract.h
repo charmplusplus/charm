@@ -90,8 +90,10 @@ public:
     return CmiPeOnSamePhysicalNode(a, b);
   }
   // Whether a move within one process and one device hands the chare over
-  // without serializing it (CkLocMgr::emigrateIntraProcess).
-  virtual bool intraProcessHandoff() const { return true; }
+  // without serializing it. The runtime has no such handoff: CkLocMgr::emigrate
+  // packs every element with device state into a staged payload, within a
+  // process too. A test may model one.
+  virtual bool intraProcessHandoff() const { return false; }
   static const LBMemoryTopology& runtime() {
     static const LBMemoryTopology t;
     return t;
@@ -236,10 +238,10 @@ public:
     return f > s ? f : s;
   }
 
-  // A move within one process onto the same device is an ownership handoff
-  // and moves no bytes. Everything else stages -- including a move within one
-  // process onto a different device, and a move between processes sharing a
-  // device (see CkLocMgr::emigrate).
+  // A move within one process onto the same device moves no bytes where the
+  // topology has an ownership handoff for it. Everything else stages --
+  // including a move within one process onto a different device, and a move
+  // between processes sharing a device (see CkLocMgr::emigrate).
   Transport transport(int fromPe, int toPe) const {
     if (fromPe == toPe) return kNone;
     if (topo_->nodeOf(fromPe) == topo_->nodeOf(toPe) &&

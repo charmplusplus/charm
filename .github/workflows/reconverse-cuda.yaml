@@ -262,3 +262,9 @@ jobs:
         run: |
           make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/gpumigrate \
             OPTS="-g"
+      - name: migmanifest compiles
+        # pup_buffer_device, the device manifest and hapiFreeMigratable: the
+        # staged migration's arena receive.
+        run: |
+          make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/migmanifest \
+            OPTS="-g"

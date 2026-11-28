@@ -141,6 +141,7 @@ env:
     tests/charm++/bcast_zcpup
     tests/charm++/proxy_delctor
     tests/charm++/bcast_priority
+    tests/util/rangeheap
     examples/charm++/user-driven-interop
     examples/charm++/hello/local
 

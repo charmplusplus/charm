@@ -12,6 +12,9 @@ array proxies, or the details of element creation (see ckarray.h).
 #include <unordered_map>
 #include <unordered_set>
 #include <atomic>
+#include <deque>
+#include <map>
+#include <vector>
 struct IndexHasher
 {
 public:
@@ -101,14 +104,15 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
                                int length_, int epoch_, CmiUInt8 life_,
-                               bool hasGPUMsg_ = false)
+                               bool hasGPUMsg_ = false, int nGpuBufs_ = 0)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
         epoch(epoch_),
         life(life_),
-        hasGPUMsg(hasGPUMsg_)
+        hasGPUMsg(hasGPUMsg_),
+        nGpuBufs(nGpuBufs_)
   {
   }
 
@@ -122,7 +126,17 @@ public:
   // device-zerocopy send. The two arrive independently and in either order;
   // whichever gets there first is buffered until the other lands.
   bool hasGPUMsg;
+  // Per-buffer sizes of the packed device payload, in pack order: the
+  // manifest the unpack checks element-wise (PUP::fromMem::deviceManifestIn).
+  int nGpuBufs;
+  // Device state but no device payload: nothing had to be copied out of the
+  // element, yet its unpack allocates its buffers again at the destination,
+  // so under +gpupool it owes the admission check a reservation just as a
+  // payload does. The source sends the request; the destination holds this
+  // message until the check has reserved those blocks (CkLocMgr::immigrate).
+  bool needsReservation = false;
   char* packData;
+  size_t* gpuManifest;
 };
 
 /******************* Map object ******************/
@@ -207,10 +221,18 @@ public:
   int toPe;
   size_t size;
   void* data;
+  // The stream the pack's copies into `data` were issued on (a hapiStream_t);
+  // the payload send is ordered behind it.
+  void* stream;
+  // What the element held on the device when it was packed, as (block size,
+  // count) pairs: the destination's admission check reserves these on top of
+  // the receive arena, since the unpack allocates them again there.
+  std::vector<CmiUInt8> blocks;
 
-  GPUMigrateData() : toPe(-1), size(0), data(nullptr) {}
-  GPUMigrateData(int toPe_, size_t size_, void* data_)
-      : toPe(toPe_), size(size_), data(data_) {}
+  GPUMigrateData() : toPe(-1), size(0), data(nullptr), stream(nullptr) {}
+  GPUMigrateData(int toPe_, size_t size_, void* data_, void* stream_,
+                 std::vector<CmiUInt8> blocks_ = std::vector<CmiUInt8>())
+      : toPe(toPe_), size(size_), data(data_), stream(stream_), blocks(std::move(blocks_)) {}
 };
 #endif
 
@@ -547,11 +569,43 @@ private:
   // them. Only an entry in the second means the device state is readable.
   std::unordered_map<CmiUInt8, void*> postedDeviceBuffers;
   std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
-  // Source PE of a landed device payload, so the ack can be addressed once
-  // the unpack has consumed it.
-
   // Unpack a migration whose host message and device payload are both present.
   void immigrateWithDevice(CkArrayElementMigrateMessage* msg);
+
+  // The admission check (+gpupool). A staged arrival is admitted at its
+  // destination only when the device pool can take its receive arena and the
+  // element's blocks above the floor of payloads this process still owes for
+  // departures the balancer ordered; until then the payload waits in the
+  // sender's pool block. Admitting takes the memory: the receive arena and an
+  // arrival set of the element's blocks, allocated without growing the pool.
+  struct HeldArrival
+  {
+    CmiUInt8 id;
+    int size;                     // payload bytes; 0 when there is no payload
+    int srcPe;
+    std::vector<CmiUInt8> blocks; // (block size, count) pairs
+    size_t footprint;             // their total
+    double since;
+    bool reported = false;
+    bool warned = false;
+  };
+  std::deque<HeldArrival> heldArrivals;  // in the order the requests came
+  std::unordered_map<CmiUInt8, char*> grantedArrivals;  // admitted, arena taken
+  std::unordered_map<CmiUInt8, std::multimap<size_t, void*>> arrivalSets;
+  bool admittingArrivals = false;
+  bool admitArrivalsAgain = false;
+  bool arrivalRetryScheduled = false;
+  int arrivalHolds = 0;
+  // Admits held arrivals in order while the pool can take them. Not
+  // re-entrant: a nested call only asks the running one for another round.
+  void admitArrivals();
+  void admitArrivalsLoop();
+  // What the arrived element's unpack did not take from its arrival set goes
+  // back to the pool.
+  void releaseArrivalSet(CmiUInt8 id);
+  // Sends a staged payload once its arrival has been granted (or at once
+  // without the admission check).
+  void dispatchGPUMsg(CmiUInt8 id);
 #endif
 
   // The mapping of index to ID is either done via compression or an explicit map,
@@ -915,7 +969,13 @@ public:
   void immigrateGPU(CmiUInt8& id, int& size, char*& data,
                     CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);
-  // Destination's ack: the staged payload has been read and can be released.
+  // The admission check's protocol: the source asks the destination to admit
+  // an arrival (size 0 for an element with device state but no payload), and
+  // the destination grants it once the pool can take it.
+  void requestArrival(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks);
+  void arrivalGranted(CmiUInt8 id);
+  // The source's staged payload has been read by the transport and freed.
+  void stagedPayloadSent(CmiUInt8 id);
 #endif
   /// Ask for the location of id (see CkLocCache::requestLocation); the PE if it is
   /// known now and the caller should send rather than buffer, else -1.

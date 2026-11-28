@@ -315,6 +315,32 @@ class er {
     pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a), allocate, deallocate);
   }
 
+  /// A device buffer the element owns and the runtime may hand back to it in
+  /// a different place. Sizing and packing are exactly
+  /// operator()(a, n, PUPMode::DEVICE). Unpacking does not copy into an
+  /// existing buffer: the caller must NOT allocate `a` first. When the
+  /// migration runtime received the payload into an arena (under +gpupool) the
+  /// pointer is rebound into that arena, which then belongs to the element;
+  /// otherwise a buffer is allocated and filled. Either way free it with
+  /// hapiFreeMigratable, never hapiFree. PUP::ers without a device region
+  /// ignore it, as they ignore DEVICE-mode buffers.
+  template<class T>
+  void pup_buffer_device(T *&a, size_t nItems) {
+    pup_buffer_device((void *&)a, nItems, sizeof(T));
+  }
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize) {
+    (void)p; (void)n; (void)itemSize;
+  }
+  /// Order this PUP::er's device copies behind the application's own device
+  /// work on the buffers it is about to pup. A packing PUP::er records an
+  /// event on `producerStream` (a hapiStream_t) and makes its copy stream wait
+  /// on it, on the device; the host does not block. The event form waits on
+  /// an event the application recorded right after its last work on those
+  /// buffers, which names only that work rather than everything queued on a
+  /// shared stream. Every other PUP::er ignores both.
+  virtual void pup_device_order(void* producerStream) { (void)producerStream; }
+  virtual void pup_device_order_event(void* producerEvent) { (void)producerEvent; }
+
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
   void operator()(void **a,size_t nItems,void *pointerSignature) {
@@ -437,6 +463,7 @@ class sizer : public er {
  protected:
   size_t nBytes;
   size_t gpuBytes;
+  size_t gpuBufCount;  // DEVICE-mode buffers the walk visited
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes_device(void *p,size_t n,size_t itemSize,dataType t);
@@ -445,9 +472,12 @@ class sizer : public er {
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
+  using er::pup_buffer_device;
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+
   //Write data to the given buffer
   sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0),
-    gpuBytes(0)
+    gpuBytes(0), gpuBufCount(0)
   {
     CmiAssert((purpose & TYPE_MASK) == 0);
   }
@@ -459,6 +489,9 @@ class sizer : public er {
   //DEVICE_PUP_ALIGN inserts between buffers, so it is directly comparable
   //with mem::gpu_size().
   size_t gpu_size(void) const {return gpuBytes;}
+  //Return the number of DEVICE buffers: the length of the manifest a packing
+  //walk records (toMem::deviceManifestOut).
+  size_t gpu_buf_count(void) const {return gpuBufCount;}
 };
 
 template <class T>
@@ -528,6 +561,34 @@ class toMem : public mem {
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
+  // A hapiStream_t, as void* so this header stays free of vendor types. If
+  // set, DEVICE-mode copies are issued asynchronously on it instead of
+  // synchronously; the caller owns their completion.
+  void* gpuStream = nullptr;
+
+  // If set, each DEVICE-mode buffer's byte size is recorded here in pack
+  // order: the manifest the unpacking walk checks against. The caller sizes
+  // it from sizer::gpu_buf_count() and passes that as the capacity; a walk
+  // that emits more buffers than the sizing walk counted aborts instead of
+  // running off the end.
+  size_t* deviceManifestOut = nullptr;
+  size_t deviceManifestIdx = 0;
+  size_t deviceManifestCap = 0;
+
+  // If set, called for every DEVICE-mode source the walk copies from, with
+  // gpuStream: how the caller learns what the asynchronous copies read, so
+  // it can keep those buffers from being reused before the copies complete
+  // (CkLocMgr::emigrate orders device pool frees behind them). A hook rather
+  // than a call into the GPU runtime, because this file is part of the
+  // Converse utility library and must not depend on it.
+  void (*deviceSourceHook)(void* ctx, const void* src, size_t bytes, void* stream) = nullptr;
+  void* deviceSourceCtx = nullptr;
+
+  using er::pup_buffer_device;
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+  virtual void pup_device_order(void* producerStream);
+  virtual void pup_device_order_event(void* producerEvent);
+
   //Write data to the given buffer, with an optional device region for
   //DEVICE-mode buffers.
   toMem(void* Nbuf, void* gpuNbuf, const unsigned int purpose = 0)
@@ -559,7 +620,36 @@ class fromMem : public mem {
 
   void pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc);
 
+  // The element-wise check of one DEVICE-mode buffer against the sender's
+  // manifest; aborts on a mismatch.
+  void deviceManifestCheck(size_t nBytes);
+
  public:
+  // The sender's per-buffer sizes of the device region (see
+  // toMem::deviceManifestOut). When set, every DEVICE-mode buffer is checked
+  // against the next entry and a mismatch aborts -- always on, like the host
+  // direction-mismatch check, since the alternative is bytes arriving at the
+  // wrong offsets silently. The caller checks deviceManifestIdx ==
+  // deviceManifestCount after the walk, which catches a walk that asked for
+  // fewer buffers than were packed.
+  const size_t* deviceManifestIn = nullptr;
+  size_t deviceManifestCount = 0;
+  size_t deviceManifestIdx = 0;
+
+  // Arena mode: the device region IS the arriving element's storage, so
+  // pup_buffer_device rebinds pointers into it instead of allocating and
+  // copying. deviceReboundCount tells the caller whether the region ended up
+  // owned by the element (keep it) or was only a receive buffer (free it).
+  bool deviceRebind = false;
+  size_t deviceReboundCount = 0;
+
+  // As toMem::gpuStream: if set, DEVICE-mode copies out of the region are
+  // asynchronous on this stream and the caller owns their completion.
+  void* gpuStream = nullptr;
+
+  using er::pup_buffer_device;
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+
   //Read data from the given buffer, with an optional device region holding
   //the DEVICE-mode buffers the sender packed.
   fromMem(const void* Nbuf, const void* gpuNbuf, const unsigned int purpose = 0)

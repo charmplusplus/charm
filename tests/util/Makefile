@@ -4,6 +4,7 @@ CHARMC=../../bin/charmc $(OPTS)
 LINKLINE=$(CHARMC) -o check check.o -language converse++
 
 all: check
+	$(MAKE) -C rangeheap all
 
 check: check.o
 	$(LINKLINE)
@@ -24,11 +25,14 @@ test: check
 	$(call run, +p4 ./check 4)
 	@echo tests if MACHINE_DEBUG is enabled in machine.h and fails if it is set
 	@if test -f "debugLog.0"; then echo "MACHINE_DEBUG is enabled"; false; fi
+	$(MAKE) -C rangeheap test
 
 testp: check
 	$(call run, +p$(P) ./check $(P))
 	@echo tests if MACHINE_DEBUG is enabled in machine.h and fails if it is set
 	@if test -f "debugLog.0"; then echo "MACHINE_DEBUG is enabled"; false; fi
+	$(MAKE) -C rangeheap testp
 
 clean:
+	$(MAKE) -C rangeheap clean
 	rm -f conv-host *.o *.bak *.log check.sts *~ charmrun charmrun.exe check check.exe check.pdb check.ilk debugLog.*

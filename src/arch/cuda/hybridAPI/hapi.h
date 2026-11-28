@@ -265,6 +265,100 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return hapiFreeHost(ptr, pool);
 }
 
+/*** Device pool ***/
+// Device buffers from segments the pool maps once and never gives back, one
+// segment set per device. Two backends (+gpupoolalloc): 'buddy', the default,
+// power-of-two blocks in cudaMalloc arenas of +gpupoolsize (CK_GPU_ARENA_MB,
+// default 256 MB), a new arena when none fits; and 'vmm', one virtual range
+// reserved per device and backed in place by chunks of +gpupoolchunk MB
+// (hapi_range_heap.h), 256-byte blocks, growth by mapping what a request is
+// short of. Malloc and free are host-side bookkeeping, so neither synchronizes
+// the device. `device` is the process-local device index
+// (CpvAccess(my_device_id)). CkDeviceMalloc/CkDeviceFree are these.
+void* hapiDevPoolMalloc(size_t size, int device);
+// The same, but nullptr instead of growing the pool when no segment has a
+// block that fits: what the migration admission check reserves with.
+void* hapiDevPoolMallocNoGrow(size_t size, int device);
+// Returns a block. If reads of it were noted (hapiDevPoolNoteRead), the block
+// is parked until they retire and handed out again only then.
+void hapiDevPoolFree(void* ptr);
+// A block an asynchronous copy reads on `stream`: a later hapiDevPoolFree of
+// it (or of a block containing it) records an event on that stream and parks
+// the block until the event completes. The stream-ordered free -- what
+// cudaFreeAsync does -- which lets a migration pack go without a host wait.
+void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
+// Blocks set aside for an element about to unpack: while a set is current on
+// this thread, hapiDevPoolMalloc serves a request from the smallest block in
+// it that fits before touching the segments. The migration runtime takes the
+// set when it admits the arrival, so the unpack allocates nothing new.
+// Leftovers are the caller's to free.
+#include <map>
+void hapiPreallocBegin(std::multimap<size_t, void*>* set);
+void hapiPreallocEnd();
+bool hapiDevPoolContains(const void* ptr);
+// The block `ptr` heads, if it is one of the pool's: what an allocation of any
+// size actually holds (the next power of two under buddy, 256-byte multiples
+// under vmm).
+bool hapiDevPoolBlockSize(const void* ptr, size_t* size);
+// The unit the transport registers for [ptr, ptr+cnt): the whole arena under
+// buddy, the run of whole chunks covering the range under vmm. A segment is
+// never unmapped, so its registration stays valid for the run. False if ptr is
+// not the pool's.
+bool hapiDevPoolSegmentOf(const void* ptr, size_t cnt, void** base, size_t* extent);
+// +gpupool: the pool is the runtime's allocation policy (see gpumanager.h).
+bool hapiDevPoolOn();
+bool hapiDevPoolIsVmm();
+// The pool's growth granule: an arena (buddy) or a chunk (vmm).
+size_t hapiDevPoolGrowthBytes();
+// Opens the startup budget on `device` (+gpupoolarenas arenas, or the vmm
+// heap with its startup mapping) if it is not open yet.
+void hapiDevPoolEnsureArena(int device);
+// Bytes the segments on `device` have free now / span, free or not.
+size_t hapiDevPoolFreeBytesOn(int device);
+size_t hapiDevPoolCapacityOn(int device);
+// For the calling PE's device: the pool's free bytes there and how many PEs of
+// this process share the device (what the migration window per PE is sized
+// from).
+void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice);
+
+/*** Migration arenas ***/
+// An arena is the one device allocation a staged migration's payload arrived
+// in, kept as the arriving element's storage because its pup_buffer_device
+// pointers were rebound into it (see PUP::er::pup_buffer_device). The
+// migration runtime registers it with the number of rebound buffers; each
+// hapiFreeMigratable of a pointer inside it counts one down, and the arena is
+// freed with hapiFree (back to the pool, for a pool block) when none is left.
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers);
+// Frees a device buffer that may be arena-interior or an ordinary allocation;
+// an application that pups with pup_buffer_device frees every such buffer
+// through this instead of hapiFree.
+void hapiFreeMigratable(void* ptr);
+
+/*** Per-element device footprint ***/
+// The producer behind the LB memory contract. Every hapiMalloc made while an
+// element's entry method runs is charged to that element's LB identity (a
+// device pool block at its block size), and hapiFree takes it back;
+// allocations outside entry methods are unattributed. Without the load
+// balancer, or on HIP, these do nothing and report 0.
+class CkLocRec;
+// The running element's charged bytes: valid inside its entry method.
+size_t hapiCurrentObjectFootprint();
+// The same footprint of `rec`, as (block size, count) pairs: what the
+// migration admission check at the destination reserves for its unpack.
+#include <vector>
+#include <utility>
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out);
+// Attribution for allocations the runtime makes on an element's behalf,
+// outside its entry methods: between hapiFootprintBegin(rec) and
+// hapiFootprintEnd() every allocation on this thread is charged to rec, or to
+// nobody when rec is null (a migration payload). Scopes nest.
+// hapiFootprintCharge charges an existing allocation to rec -- a receive
+// arena, allocated before the element it becomes storage for existed; a pool
+// block is charged at its block size whatever `size` says.
+void hapiFootprintBegin(CkLocRec* rec);
+void hapiFootprintEnd();
+void hapiFootprintCharge(void* ptr, size_t size, CkLocRec* rec);
+
 #if CMK_CUDA && CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();
@@ -309,18 +403,20 @@ bool hapiCuptiTracingActive();
 // (LBMemoryContract.h), for the calling PE's device:
 //   devFree     free device bytes (cudaMemGetInfo); shared by every process
 //               on the device
-//   poolFree    the free bytes of the +gpulbbuffer region, the staging space
-//               a device migration uses; 0 without +gpushm
-//   arenaBytes  the arena quantum of a device pool chare state and staging
-//               share; 0, since staging is the separate +gpulbbuffer reserve
+//   poolFree    under +gpupool, this process's free device pool bytes on the
+//               PE's device; otherwise the free bytes of the +gpulbbuffer
+//               region (0 without +gpushm)
+//   arenaBytes  under +gpupool, the pool's growth granule (an arena, or a vmm
+//               chunk), which says chare state and staging share the pool;
+//               otherwise 0
 //   ipcSlots    CUDA IPC event slots this PE may spend on migrations in one
 //               batch: three quarters of its slice, since application sends
 //               draw on the same slots. 0 when there is no IPC slot pool.
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots);
-// The capacity of a device pool on the calling PE's device, free or not, which
-// the contract measures its reserve against (LBMigrateWindow.h); 0 when the
-// runtime has no device pool, as here.
+// Under +gpupool, the capacity of this process's device pool on the calling
+// PE's device, free or not, which the contract measures its reserve against
+// (LBMigrateWindow.h); 0 without +gpupool.
 size_t hapiLBDevicePoolCapacity();
 
 // Attribute one kernel launch to the running object. The runtime already
