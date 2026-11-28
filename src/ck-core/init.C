@@ -242,6 +242,7 @@ extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 extern void _libStopSchedulerHandler(void *msg);
+extern void _interopCheckStart();
 extern int _libStopSchedulerHandlerIdx;
 CpvCExtern(int,interopExitFlag);
 void StopInteropScheduler();
@@ -1434,6 +1435,8 @@ bool CkDynCallRegisterHook(void);   /* src/ck-core/ckdyn.C */
 void _initCharm(int unused_argc, char **argv)
 { 
   int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+
+  if (CmiMyRank() == 0) _interopCheckStart();
 
   DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
   std::set_terminate([](){

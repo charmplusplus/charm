@@ -370,6 +370,17 @@ public:
   virtual char* ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
+  // migrateMe's request: migrateMe counted the start (CkMigrationStarted),
+  // this counts the finish. A disk checkpoint waits until the two balance.
+  void ckEmigrateCounted(int toPe)
+  {
+    CkMigrationFinished();
+    ckEmigrate(toPe);
+  }
+
+  // Not counted, so that a direct sender, which counts no start, cannot leave
+  // the finished total above the started total; a disk checkpoint does not
+  // wait for such a move.
   void ckEmigrate(int toPe)
   {
     if(!_isAnytimeMigration)
