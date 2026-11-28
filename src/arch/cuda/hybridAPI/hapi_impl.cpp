@@ -3004,7 +3004,10 @@ int hapiMyDeviceTotalSMs() {
   return dm.multi_processor_count;
 }
 
-size_t hapiLBDevicePoolCapacity() { return 0; }
+size_t hapiLBDevicePoolCapacity() {
+  if (!CsvAccess(gpu_manager).device_pool_on) return 0;
+  return hapiDevPoolCapacityOn(CpvAccess(my_device_id));
+}
 
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots) {
@@ -3015,14 +3018,158 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
   *arenaBytes = 0;
   *poolFree = 0;
   *ipcSlots = 0;
-  if (csv_gpu_manager.use_shm) {
+  if (csv_gpu_manager.device_pool_on) {
+    // Chare state, migration payloads and receive arenas all come from the
+    // pool, which grows into free device memory a granule at a time. The
+    // contract reads the two separately: pool bytes are this process's,
+    // device bytes are shared by every process on the device.
+    *poolFree = hapiDevPoolFreeBytesOn(CpvAccess(my_device_id));
+    *arenaBytes = hapiDevPoolGrowthBytes();
+  } else if (csv_gpu_manager.use_shm) {
     auto it = csv_gpu_manager.device_map.find(CmiMyPe());
     if (it != csv_gpu_manager.device_map.end() && it->second != nullptr)
       *poolFree = it->second->get_lb_buffer_free_size();
+  }
+  if (csv_gpu_manager.use_shm) {
     const int slice = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
     *ipcSlots = slice >= 4 ? slice * 3 / 4 : (slice > 0 ? 1 : 0);
   }
 }
+
+/*** Per-element device footprint (see hapi.h) ***/
+// Identity comes from the same source as CUPTI kernel attribution -- the
+// active location record -- and survives migration within a process.
+// Allocations outside entry methods (startup, comm buffers, pool segments)
+// are unattributed; the consumer floors the footprint at the serialized
+// device size, so missing attribution errs toward refusing a move, never
+// toward approving one.
+#if CMK_CUDA && CMK_LBDB_ON
+#include <mutex>
+#include <map>
+namespace {
+std::unordered_map<LDObjKey, size_t, LDObjKeyHash> gpu_obj_footprint;
+// The same footprint as blocks: size -> count, the shape the admission check
+// has to find room for at the destination (hapiObjectBlocks).
+std::unordered_map<LDObjKey, std::map<size_t, int>, LDObjKeyHash> gpu_obj_blocks;
+std::unordered_map<void*, std::pair<LDObjKey, size_t>> gpu_ptr_owner;
+std::mutex gpu_footprint_lock;
+
+void hapiDropBlockLocked(const LDObjKey& key, size_t size) {
+  auto ob = gpu_obj_blocks.find(key);
+  if (ob == gpu_obj_blocks.end()) return;
+  auto b = ob->second.find(size);
+  if (b == ob->second.end()) return;
+  if (--b->second <= 0) ob->second.erase(b);
+  if (ob->second.empty()) gpu_obj_blocks.erase(ob);
+}
+
+// Attribution set by the runtime: charge a given element, or nobody.
+struct HapiFootprintScope { bool nobody; LDObjKey key; };
+thread_local std::vector<HapiFootprintScope> hapi_footprint_scopes;
+
+bool hapiKeyOf(CkLocRec* rec, LDObjKey& key) {
+  if (rec == NULL) return false;
+  const LDObjHandle& handle = rec->getLdHandle();
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  return true;
+}
+
+bool hapiActiveObjKey(LDObjKey& key) {
+  if (!hapi_footprint_scopes.empty()) {
+    if (hapi_footprint_scopes.back().nobody) return false;
+    key = hapi_footprint_scopes.back().key;
+    return true;
+  }
+  return hapiKeyOf(CkActiveLocRec(), key);
+}
+
+void hapiChargeLocked(const LDObjKey& key, void* ptr, size_t size) {
+  auto prev = gpu_ptr_owner.find(ptr);
+  if (prev != gpu_ptr_owner.end()) {   // charged again: move it, do not double it
+    auto owner = gpu_obj_footprint.find(prev->second.first);
+    if (owner != gpu_obj_footprint.end())
+      owner->second -= std::min(owner->second, prev->second.second);
+    hapiDropBlockLocked(prev->second.first, prev->second.second);
+  }
+  gpu_obj_footprint[key] += size;
+  gpu_obj_blocks[key][size]++;
+  gpu_ptr_owner[ptr] = std::make_pair(key, size);
+}
+
+// Charges an allocation to the running element (or the runtime's scope).
+void hapiRecordAlloc(void* ptr, size_t size) {
+  if (ptr == NULL) return;
+  LDObjKey key{};
+  if (!hapiActiveObjKey(key)) return;   // a runtime allocation: unattributed
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  hapiChargeLocked(key, ptr, size);
+}
+
+// Takes a freed allocation's charge back from whoever holds it.
+void hapiRecordFree(void* ptr) {
+  if (ptr == NULL) return;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_ptr_owner.find(ptr);
+  if (it == gpu_ptr_owner.end()) return;   // not attributed at allocation
+  auto owner = gpu_obj_footprint.find(it->second.first);
+  if (owner != gpu_obj_footprint.end())
+    owner->second -= std::min(owner->second, it->second.second);
+  hapiDropBlockLocked(it->second.first, it->second.second);
+  gpu_ptr_owner.erase(it);
+}
+}  // namespace
+
+void hapiFootprintBegin(CkLocRec* rec) {
+  HapiFootprintScope s;
+  s.nobody = !hapiKeyOf(rec, s.key);
+  hapi_footprint_scopes.push_back(s);
+}
+
+void hapiFootprintEnd() {
+  if (!hapi_footprint_scopes.empty()) hapi_footprint_scopes.pop_back();
+}
+
+void hapiFootprintCharge(void* ptr, size_t size, CkLocRec* rec) {
+  LDObjKey key{};
+  if (ptr == NULL || !hapiKeyOf(rec, key)) return;
+  size_t blk = 0;
+  if (hapiDevPoolBlockSize(ptr, &blk)) size = blk;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  hapiChargeLocked(key, ptr, size);
+}
+
+size_t hapiCurrentObjectFootprint() {
+  LDObjKey key{};
+  if (!hapiActiveObjKey(key)) return 0;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_obj_footprint.find(key);
+  return (it == gpu_obj_footprint.end()) ? 0 : it->second;
+}
+
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out) {
+  out.clear();
+  LDObjKey key{};
+  if (!hapiKeyOf(rec, key)) return;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_obj_blocks.find(key);
+  if (it == gpu_obj_blocks.end()) return;
+  for (const auto& b : it->second) out.emplace_back(b.first, b.second);
+}
+#else
+static void hapiRecordAlloc(void* ptr, size_t size) { (void)ptr; (void)size; }
+static void hapiRecordFree(void* ptr) { (void)ptr; }
+void hapiFootprintBegin(CkLocRec* rec) { (void)rec; }
+void hapiFootprintEnd() {}
+void hapiFootprintCharge(void* ptr, size_t size, CkLocRec* rec) {
+  (void)ptr; (void)size; (void)rec;
+}
+size_t hapiCurrentObjectFootprint() { return 0; }
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out) {
+  (void)rec;
+  out.clear();
+}
+#endif  // CMK_CUDA && CMK_LBDB_ON
 
 /*** Device pool (see hapi.h) ***/
 #include <mutex>
@@ -3396,23 +3543,45 @@ HapiDevPoolArena& hapiDevPoolNewVmmHeapLocked(int dev) {
   return ref;
 }
 
+// Under the pool lock: a block of `size` bytes on `dev`, growing the pool if
+// `grow`; its block size in *held.
+void* hapiDevPoolTakeLocked(size_t size, int dev, bool grow, size_t* held);
+
 void* hapiDevPoolMallocImpl(size_t size, int dev, bool grow) {
-  // An arrival set serves first: the smallest block in it that fits.
+  // An arrival set serves first: the smallest block in it that fits. The
+  // block is charged now, to whoever is allocating, at its block size.
   if (hapi_prealloc_current != nullptr && !hapi_prealloc_current->empty()) {
     auto it = hapi_prealloc_current->lower_bound(size);
     if (it != hapi_prealloc_current->end()) {
       void* p = it->second;
+      const size_t held = it->first;
       hapi_prealloc_current->erase(it);
+      hapiRecordAlloc(p, held);
       return p;
     }
   }
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  void* q = nullptr;
+  size_t held = 0;
+  {
+    std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+    q = hapiDevPoolTakeLocked(size, dev, grow, &held);
+  }
+  // Charged at the block's size, which is what the pool gave up for it.
+  if (q != nullptr) hapiRecordAlloc(q, held);
+  return q;
+}
+
+void* hapiDevPoolTakeLocked(size_t size, int dev, bool grow, size_t* held) {
   hapiDevPoolReapLocked();
   void* q = nullptr;
+  *held = size;
   for (auto& ar : hapi_devpool_arenas) {
     if (ar.device != dev) continue;
     q = ar.alloc->malloc(size);
-    if (q) return q;
+    if (q) {
+      ar.alloc->blockSize(q, held);
+      return q;
+    }
   }
   if (!grow) return nullptr;
   // Growth: say what the segments had, so grown memory can be traced to its
@@ -3442,11 +3611,13 @@ void* hapiDevPoolMallocImpl(size_t size, int dev, bool grow) {
     ar->end = ar->start + ar->alloc->extent();
     q = ar->alloc->malloc(size);
     if (!q) CmiAbort("hapiDevPoolMalloc (vmm): no block after growing");
+    ar->alloc->blockSize(q, held);
     return q;
   }
   HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(size, dev);
   q = ar.alloc->malloc(size);
   if (!q) CmiAbort("hapiDevPoolMalloc: request larger than a fresh arena");
+  ar.alloc->blockSize(q, held);
   return q;
 }
 }  // namespace
@@ -3461,6 +3632,7 @@ void* hapiDevPoolMallocNoGrow(size_t size, int dev) {
 
 void hapiDevPoolFree(void* ptr) {
   if (ptr == NULL) return;
+  hapiRecordFree(ptr);   // the ledger's lock is never held together with the pool's
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (!ar) CmiAbort("hapiDevPoolFree: pointer is not from the device pool");
@@ -3624,12 +3796,15 @@ void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice) {
 
 // hapiMalloc / hapiFree (hapi_portable.h): the pool under +gpupool, the
 // vendor's allocator otherwise.
+// The pool charges the footprint ledger itself; the vendor path charges here.
 hapiError_t hapiMallocImpl(void** ptr, size_t size) {
   if (hapiDevPoolOn()) {
     *ptr = hapiDevPoolMalloc(size, CpvAccess(my_device_id));
     return (*ptr != nullptr) ? hapiSuccess : hapiErrorMemoryAllocation;
   }
-  return hapiMallocRaw(ptr, size);
+  const hapiError_t err = hapiMallocRaw(ptr, size);
+  if (err == hapiSuccess) hapiRecordAlloc(*ptr, size);
+  return err;
 }
 
 hapiError_t hapiFreeImpl(void* ptr) {
@@ -3640,6 +3815,7 @@ hapiError_t hapiFreeImpl(void* ptr) {
     hapiDevPoolFree(ptr);
     return hapiSuccess;
   }
+  hapiRecordFree(ptr);
   return hapiFreeRaw(ptr);
 }
 
@@ -3652,6 +3828,43 @@ hapiError_t hapiFreeAsync(void* ptr, hapiStream_t stream) {
     hapiDevPoolFree(ptr);
     return hapiSuccess;
   }
+  hapiRecordFree(ptr);
   return hapiFreeRaw(ptr);
+}
+
+/*** Migration arena registry (see hapi.h) ***/
+namespace {
+struct HapiArenaRec {
+  size_t extent;
+  size_t live;
+};
+// Ordered by base so an interior pointer resolves with upper_bound. Shared by
+// every PE of the process, hence the mutex.
+std::map<char*, HapiArenaRec> hapi_arena_registry;
+std::mutex hapi_arena_registry_lock;
+}  // namespace
+
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers) {
+  std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
+  hapi_arena_registry[(char*)base] = HapiArenaRec{extent, liveBuffers};
+}
+
+void hapiFreeMigratable(void* ptr) {
+  if (ptr == NULL) return;
+  void* arena_to_free = NULL;
+  {
+    std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
+    auto it = hapi_arena_registry.upper_bound((char*)ptr);
+    if (it != hapi_arena_registry.begin()) {
+      --it;
+      if ((char*)ptr >= it->first && (char*)ptr < it->first + it->second.extent) {
+        // Arena-interior: free the arena with its last rebound buffer.
+        if (--it->second.live > 0) return;
+        arena_to_free = it->first;
+        hapi_arena_registry.erase(it);
+      }
+    }
+  }
+  hapiCheck(hapiFree(arena_to_free != NULL ? arena_to_free : ptr));
 }
 

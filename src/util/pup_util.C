@@ -193,9 +193,12 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
  * way therefore migrates its device data but does not checkpoint it.
  */
 #if CMK_CUDA || CMK_HIP
-static void pupDeviceCopy(void *dst, const void *src, size_t n)
+// A device-to-device copy, asynchronous on `stream` when one is given.
+static void pupDeviceCopy(void *dst, const void *src, size_t n, void *stream)
 {
-	hapiError_t err = hapiMemcpy(dst, src, n, hapiMemcpyDeviceToDevice);
+	hapiError_t err = (stream != nullptr)
+	    ? hapiMemcpyAsync(dst, src, n, hapiMemcpyDeviceToDevice, (hapiStream_t)stream)
+	    : hapiMemcpy(dst, src, n, hapiMemcpyDeviceToDevice);
 	if (err != hapiSuccess)
 		CmiAbort("PUP: device-to-device copy of %zu bytes failed: %s",
 		         n, hapiGetErrorString(err));
@@ -205,6 +208,12 @@ static void pupDeviceCopy(void *dst, const void *src, size_t n)
 void PUP::sizer::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
 {
 	gpuBytes = alignDeviceOffset(gpuBytes) + n*itemSize;
+	gpuBufCount++;
+}
+
+void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+	bytes_device(p, n, itemSize, Tchar);
 }
 
 void PUP::toMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
@@ -212,10 +221,76 @@ void PUP::toMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
 	if (gpuOrigBuf == nullptr) return;
 	n*=itemSize;
 #if CMK_CUDA || CMK_HIP
+	if (deviceManifestOut != nullptr) {
+		if (deviceManifestIdx >= deviceManifestCap)
+			CmiAbort("PUP device manifest overflow: the packing walk emitted device "
+			         "buffer #%zu but the sizing walk counted only %zu. The pup routine "
+			         "does not emit the same device buffers in both walks.\n",
+			         deviceManifestIdx + 1, deviceManifestCap);
+		deviceManifestOut[deviceManifestIdx++] = n;
+	}
+	if (deviceSourceHook != nullptr) deviceSourceHook(deviceSourceCtx, p, n, gpuStream);
 	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
-	pupDeviceCopy((void *)gpuBuf, p, n);
+	pupDeviceCopy((void *)gpuBuf, p, n, gpuStream);
 	gpuBuf += n;
 #endif
+}
+
+void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+	bytes_device(p, n, itemSize, Tchar);
+}
+
+void PUP::toMem::pup_device_order(void* producerStream)
+{
+#if CMK_CUDA || CMK_HIP
+	if (producerStream == nullptr || gpuOrigBuf == nullptr) return;
+	// One event per thread is enough: the record and the wait are issued back
+	// to back, and the wait captures the event's state at the time of the
+	// call, so a later record cannot disturb an earlier wait.
+	static thread_local hapiEvent_t ev = nullptr;
+	hapiError_t err = hapiSuccess;
+	if (ev == nullptr) err = hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+	if (err == hapiSuccess) err = hapiEventRecord(ev, (hapiStream_t)producerStream);
+	if (err == hapiSuccess) err = hapiStreamWaitEvent((hapiStream_t)gpuStream, ev, 0);
+	if (err != hapiSuccess)
+		CmiAbort("PUP: ordering device copies behind a stream failed: %s",
+		         hapiGetErrorString(err));
+#else
+	(void)producerStream;
+#endif
+}
+
+void PUP::toMem::pup_device_order_event(void* producerEvent)
+{
+#if CMK_CUDA || CMK_HIP
+	if (producerEvent == nullptr || gpuOrigBuf == nullptr) return;
+	const hapiError_t err =
+	    hapiStreamWaitEvent((hapiStream_t)gpuStream, (hapiEvent_t)producerEvent, 0);
+	if (err != hapiSuccess)
+		CmiAbort("PUP: ordering device copies behind an event failed: %s",
+		         hapiGetErrorString(err));
+#else
+	(void)producerEvent;
+#endif
+}
+
+// Element-wise manifest check: the unpacking walk must ask for exactly the
+// buffers the packing walk wrote, in order and size. A difference means the
+// pup routine branches differently on the two sides, and every byte after it
+// would be read from a wrong offset.
+void PUP::fromMem::deviceManifestCheck(size_t nBytes)
+{
+	if (deviceManifestIn == nullptr) return;
+	if (deviceManifestIdx >= deviceManifestCount)
+		CmiAbort("Device pup direction mismatch: unpack asked for device buffer #%zu "
+		         "(%zu bytes) but the sender packed only %zu device buffers",
+		         deviceManifestIdx + 1, nBytes, deviceManifestCount);
+	if (deviceManifestIn[deviceManifestIdx] != nBytes)
+		CmiAbort("Device pup direction mismatch: unpack asked for %zu bytes for device "
+		         "buffer #%zu but the sender packed %zu",
+		         nBytes, deviceManifestIdx + 1, deviceManifestIn[deviceManifestIdx]);
+	deviceManifestIdx++;
 }
 
 void PUP::fromMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
@@ -223,8 +298,32 @@ void PUP::fromMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
 	if (gpuOrigBuf == nullptr) return;
 	n*=itemSize;
 #if CMK_CUDA || CMK_HIP
+	deviceManifestCheck(n);
 	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
-	pupDeviceCopy(p, (const void *)gpuBuf, n);
+	pupDeviceCopy(p, (const void *)gpuBuf, n, gpuStream);
+	gpuBuf += n;
+#endif
+}
+
+void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+	if (gpuOrigBuf == nullptr) return;
+	n*=itemSize;
+#if CMK_CUDA || CMK_HIP
+	deviceManifestCheck(n);
+	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+	if (deviceRebind) {
+		p = (void *)gpuBuf;
+		deviceReboundCount++;
+	} else {
+		// The vendor's allocator, which hapiFreeMigratable frees as an ordinary
+		// allocation (this file cannot reach the device pool).
+		hapiError_t err = hapiMallocRaw(&p, n ? n : 1);
+		if (err != hapiSuccess)
+			CmiAbort("PUP: allocating a %zu-byte device buffer for unpacking failed: %s",
+			         n, hapiGetErrorString(err));
+		pupDeviceCopy(p, (const void *)gpuBuf, n, gpuStream);
+	}
 	gpuBuf += n;
 #endif
 }

@@ -51,6 +51,14 @@ public:
   // The deferred move, from the scheduler: taken now if the element may
   // migrate, else left for its next safe point, as recvMigrate does.
   void resumeDeferredMigration(int toPe);
+
+  // The serialized device size the load balancer last recorded for this
+  // element (setGPUPupSize): what a move of it will stage.
+  size_t lbGpuPupSize = 0;
+  // Under +gpupool, the payload block a move the balancer ordered owes the
+  // device pool until emigrate packs it: counted in the process's floor of
+  // owed packs, which the migration admission check keeps free.
+  size_t pendingPackBytes = 0;
 #endif
 
   /** Invoke the given entry method on this element.

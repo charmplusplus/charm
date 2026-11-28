@@ -10510,6 +10510,35 @@ payloads and receive buffers come from the pool, and the arenas named by
 mapped) are opened at startup, since the load balancer plans migrations only
 within the memory the pool already has.
 
+Under ``+gpupool`` the device memory a migration needs is also checked
+while it runs. Each chare's device footprint (what its ``hapiMalloc`` calls
+and pool blocks hold, at least its packed device size) is reported to the
+load balancer at ``AtSync``. A migration's device payload is sent only once
+its destination has reserved, from the pool and without growing it, the
+receive buffer for the payload and the blocks the chare's unpack will allocate,
+keeping free what that process still owes for departures the balancer
+ordered; an arrival that does not fit waits, and after 120 seconds is
+admitted anyway with a warning. Each PE also limits the migrations it has in
+flight to the IPC event slots it may spend on them (under ``+gpushm``) and
+their payloads to its share of a quarter of the pool (at most 256 MB per
+PE); ``CHARM_LB_MIGRATE_WINDOW`` (migrations) and
+``CHARM_LB_MIGRATE_WINDOW_MB`` in the environment override the two limits.
+
+A migrating chare carries its device buffers in its ``pup`` routine in one of
+two ways. ``p(ptr, n, PUP::PUPMode::DEVICE)`` copies into a buffer the chare
+owns, so the unpacking chare allocates ``ptr`` before the call.
+``p.pup_buffer_device(ptr, n)`` leaves the buffer to the runtime system: the
+unpacking chare must not allocate ``ptr``, and receives either a fresh buffer
+holding the data or, under ``+gpupool``, a pointer into the pool block the
+migration's device payload arrived in, which then belongs to the chare and is
+not copied again. Either way such a buffer is freed with
+``hapiFreeMigratable(ptr)``, never ``hapiFree``. The device payload of a
+migration carries the size of every buffer packed, and an unpack that asks for
+a different buffer, or for fewer buffers, aborts. The pack copies are ordered
+behind work queued on the legacy default stream; a chare whose device state is
+written on its own non-blocking stream calls ``p.pup_device_order(stream)``
+(or ``p.pup_device_order_event(event)``) before pupping those buffers.
+
 ``CkDeviceMalloc`` is for buffers that are going to be sent or received
 into, not a general device allocator. Registration is per arena and covers
 the whole arena, so anything else allocated from the pool -- scratch space,

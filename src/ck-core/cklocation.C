@@ -45,6 +45,243 @@ CpvExtern(std::vector<NcpyOperationInfo*>, newZCPupGets);  // used for ZC Pup
 CkpvExtern(int, currentChareIdx);
 #endif
 
+#if CMK_CUDA
+#include "LBMigrateWindow.h"
+#include <deque>
+
+// The admission check (+gpupool): a staged arrival is admitted at its
+// destination only if the device pool can take its receive arena and the
+// element's blocks above what the destination's process still owes for departures the
+// balancer ordered -- the floor. Packs are never held and never wait on
+// anything remote, so a held arrival waits only on local progress: its
+// process's own packs, a payload the transport has finished reading, or a
+// free. A held arrival costs the destination nothing; its payload stays in the
+// sender's pool block.
+//
+// The arrival's full cost is its payload block plus the element's footprint at
+// the source, sent as the blocks that make it up (GPUMigrateData::blocks). The
+// check reserves by allocating: it takes the receive arena and every one of
+// those blocks from the pool without growing it, or holds the arrival. Byte
+// sums are not enough under a buddy allocator -- 8 MB receive arenas can split
+// the 16 MB blocks an arrival's state needs. The blocks taken are the arrival
+// set, which the element's unpack is served from (hapiPreallocBegin), so it
+// allocates nothing new; what it leaves -- everything, for an element that
+// rebinds its buffers into the arena -- is freed after the unpack.
+//
+// Under the pool, payloads, receive arenas and chare state are all blocks of
+// one pool. Without the floor an arrival could take the bytes a departure
+// needs to pack, while that departure's destination waits on an arrival of
+// its own. The check reads what the pool has free now, as the balancer's batch
+// planner does (LBMemoryContract.h): growing the pool is not credited.
+static std::atomic<size_t> ck_pending_pack_bytes{0};
+
+static inline bool ckAdmissionOn() { return CkDevicePoolOn(); }
+
+static inline size_t ckPoolBlock(size_t bytes)
+{
+  if (bytes == 0) return 0;
+  size_t b = 4;
+  while (b < bytes) b <<= 1;
+  return b;
+}
+
+// The payload block a move of rec will pack. Every move of an element with
+// device state stages.
+static size_t ckStagedBytes(CkLocRec* rec) { return ckPoolBlock(rec->lbGpuPupSize); }
+
+// A move the balancer ordered owes its payload from now until emigrate packs
+// it, or the element goes without packing.
+static void ckNotePendingPack(CkLocRec* rec)
+{
+  if (!ckAdmissionOn()) return;
+  const size_t bytes = ckStagedBytes(rec);
+  if (rec->pendingPackBytes > 0) ck_pending_pack_bytes -= rec->pendingPackBytes;
+  rec->pendingPackBytes = bytes;
+  if (bytes > 0) ck_pending_pack_bytes += bytes;
+}
+
+static void ckClearPendingPack(CkLocRec* rec)
+{
+  if (rec->pendingPackBytes == 0) return;
+  ck_pending_pack_bytes -= rec->pendingPackBytes;
+  rec->pendingPackBytes = 0;
+}
+
+// Whether an arrival of `size` payload bytes, for an element whose state is
+// `footprint` bytes, could be taken from the pool now, by bytes: the pool's
+// free bytes less the floor. Earlier grants are already allocated, so they
+// are already out of the free bytes. The cheap check; the grant allocates.
+static bool ckArrivalAdmissible(size_t size, size_t footprint, size_t* reachOut,
+                                size_t* floorOut)
+{
+  size_t devFree = 0, poolFree = 0, arena = 0;
+  int slots = 0;
+  hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
+  const size_t floor = ck_pending_pack_bytes.load();
+  *reachOut = poolFree;
+  *floorOut = floor;
+  return poolFree >= ckPoolBlock(size) + footprint + floor;
+}
+
+// Takes the receive arena and the element's blocks from the pool, without
+// growing it unless `grow`; on any miss, gives everything back and fails.
+// Largest blocks first, the order a buddy allocator fits best.
+static bool ckTakeArrivalSet(int size, const std::vector<CmiUInt8>& blocks,
+                             char** arenaOut, std::multimap<size_t, void*>& set,
+                             bool grow = false)
+{
+  std::vector<std::pair<size_t, int>> want;
+  for (size_t k = 0; k + 1 < blocks.size(); k += 2)
+    want.emplace_back((size_t)blocks[k], (int)blocks[k + 1]);
+  std::sort(want.begin(), want.end(),
+            [](const std::pair<size_t, int>& a, const std::pair<size_t, int>& b) {
+              return a.first > b.first;
+            });
+  hapiFootprintBegin(nullptr);   // nobody's until the unpack takes them
+  bool ok = true;
+  for (const auto& w : want) {
+    for (int c = 0; ok && c < w.second; c++) {
+      void* p = grow ? CkDeviceMalloc(w.first) : CkDeviceMallocNoGrow(w.first);
+      if (p == nullptr) ok = false;
+      else set.emplace(w.first, p);
+    }
+    if (!ok) break;
+  }
+  char* arena = nullptr;
+  if (ok && size > 0) {
+    arena = (char*)(grow ? CkDeviceMalloc((size_t)size) : CkDeviceMallocNoGrow((size_t)size));
+    if (arena == nullptr) ok = false;
+  }
+  hapiFootprintEnd();
+  if (!ok) {
+    for (auto& e : set) CkDeviceFree(e.second);
+    set.clear();
+    if (arena) CkDeviceFree(arena);
+    return false;
+  }
+  *arenaOut = arena;
+  return true;
+}
+
+// Under the vmm pool a block never crosses a chunk boundary, so the free bytes
+// an arrival was admitted on can sit in holes too small for its largest block;
+// waiting for a free then waits on departures in a later batch, which is
+// released only when this one completes. A chunk is mapped and registered on
+// its own, with no per-process ceiling, so the arrival maps what it is short
+// of instead, if the device has the memory: the set rounded up to whole
+// chunks, and one chunk more.
+static bool ckTakeArrivalSetGrowingVmm(int size, size_t footprint,
+                                       const std::vector<CmiUInt8>& blocks,
+                                       char** arenaOut, std::multimap<size_t, void*>& set)
+{
+  if (!hapiDevPoolIsVmm()) return false;
+  size_t devFree = 0, poolFree = 0, chunk = 0;
+  int slots = 0;
+  hapiLBDeviceMemory(&devFree, &poolFree, &chunk, &slots);
+  if (chunk == 0) return false;
+  const size_t need = ckPoolBlock(size) + footprint;
+  if (devFree < (need + chunk - 1) / chunk * chunk + chunk) return false;
+  return ckTakeArrivalSet(size, blocks, arenaOut, set, /*grow=*/true);
+}
+
+// The migration window (+gpupool): pacing, where the batch planner and the
+// admission check are what keep a step inside device memory. It bounds how
+// much of a step one PE has in flight at once, so a balancer that issues a
+// whole step together does not hold every payload block and every IPC slot of
+// the step at the same moment. A staged move takes a place when recvMigrate
+// sees it, if this PE has fewer moves in flight than its IPC slot budget and
+// one more payload keeps its bytes in flight within the byte bound; otherwise
+// it queues, in order. The place is given back when the transport has read the
+// payload, or as soon as the move turns out not to stage. The byte bound per
+// PE is its share of the arrival reserve L_g the balancer holds back on the
+// device (LBMigrateWindow.h), so the two are one number. CHARM_LB_MIGRATE_WINDOW
+// (moves) and CHARM_LB_MIGRATE_WINDOW_MB override the bounds.
+struct CkMigrateWindow
+{
+  struct Entry { size_t bytes; bool packed; };
+  std::unordered_map<CmiUInt8, Entry> inflight;  // by element id
+  size_t bytes = 0;
+  struct Queued { CkLocMgr* mgr; CmiUInt8 id; int toPe; };
+  std::deque<Queued> queue;
+  bool pumpScheduled = false;
+};
+static thread_local CkMigrateWindow ck_window;  // one per PE
+
+static inline bool ckWindowOn() { return CkDevicePoolOn(); }
+
+static void ckWindowLimits(int* moves, size_t* bytes)
+{
+  static thread_local int m = -1;
+  if (m < 0) {
+    size_t devFree = 0, poolFree = 0, arena = 0;
+    int slots = 0;
+    hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
+    const char* em = getenv("CHARM_LB_MIGRATE_WINDOW");
+    m = em ? atoi(em) : slots;
+  }
+  // The pool's capacity, not the bytes free now: that is what the balancer
+  // reserved from.
+  size_t poolFree = 0;
+  int pes = 1;
+  hapiLBDevicePool(&poolFree, &pes);
+  const size_t capacity = hapiLBDevicePoolCapacity();
+  *moves = m;
+  *bytes = lbLandingWindowBytes(capacity > poolFree ? capacity : poolFree, (size_t)pes);
+}
+
+// Takes a place for a move of `bytes` if there is one. The first move always
+// goes, so a payload larger than the byte bound still moves, alone.
+static bool ckWindowTake(CmiUInt8 id, size_t bytes)
+{
+  int maxMoves;
+  size_t maxBytes;
+  ckWindowLimits(&maxMoves, &maxBytes);
+  const bool empty = ck_window.inflight.empty();
+  if (!empty && maxMoves > 0 && (int)ck_window.inflight.size() >= maxMoves) return false;
+  if (!empty && ck_window.bytes + bytes > maxBytes) return false;
+  ck_window.inflight[id] = CkMigrateWindow::Entry{bytes, false};
+  ck_window.bytes += bytes;
+  return true;
+}
+
+static void ckWindowPump(void*, double);
+
+static void ckWindowGiveBack(CmiUInt8 id, bool onlyIfUnpacked)
+{
+  auto it = ck_window.inflight.find(id);
+  if (it == ck_window.inflight.end()) return;
+  if (onlyIfUnpacked && it->second.packed) return;
+  ck_window.bytes -= it->second.bytes;
+  ck_window.inflight.erase(it);
+  if (!ck_window.queue.empty() && !ck_window.pumpScheduled) {
+    ck_window.pumpScheduled = true;
+    CcdCallFnAfter(ckWindowPump, nullptr, 0.0);  // from the scheduler, not from inside emigrate
+  }
+}
+
+// Starts queued moves, in order, while the window has places for them. Only
+// moves the balancer ordered queue (CkLocRec::recvMigrate).
+static void ckWindowPump(void*, double)
+{
+  ck_window.pumpScheduled = false;
+#if CMK_LBDB_ON
+  while (!ck_window.queue.empty())
+  {
+    const CkMigrateWindow::Queued q = ck_window.queue.front();
+    CkLocRec* rec = q.mgr->localRecord(q.id);
+    if (rec == nullptr)  // gone while it waited
+    {
+      ck_window.queue.pop_front();
+      continue;
+    }
+    if (!ckWindowTake(q.id, ckStagedBytes(rec))) return;
+    ck_window.queue.pop_front();
+    rec->recvMigrate(q.toPe);  // holds a place now, so it goes on from here
+  }
+#endif
+}
+#endif
+
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void*, CkGridObject);
 #endif
@@ -1856,7 +2093,15 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false)
     UserSetLBLoad();
 
-  if (_lb_psizer_on || _lb_args.metaLbOn())
+#if CMK_CUDA && CMK_LB_USER_DATA
+  // The device footprint slot the memory contract reads (registered in
+  // _loadbalancerInit): -1 when no slot was claimed.
+  const int fpSlot = CkpvAccess(_lb_obj_index);
+  void* fpData = (fpSlot >= 0) ? getObjUserData(fpSlot) : NULL;
+#else
+  void* fpData = NULL;
+#endif
+  if (_lb_psizer_on || _lb_args.metaLbOn() || fpData != NULL)
   {
     PUP::sizer ps(PUP::er::IS_MIGRATION);
     this->virtual_pup(ps);
@@ -1867,6 +2112,18 @@ void CkMigratable::AtSync(int waitForMigration)
     // migration against free device memory needs the real figure, and pupSize
     // is an encoded approximation tuned for host state.
     setGPUPupSize(ps.gpu_size());
+#endif
+#if CMK_CUDA && CMK_LB_USER_DATA
+    if (fpData != NULL)
+    {
+      // What the element holds on the device: its hapiMalloc and device pool
+      // blocks, and the migration arena it arrived in. Floored at the
+      // serialized device size, so an allocation made for it by other code,
+      // which is not charged to it, never makes it look free to move.
+      size_t footprint = hapiCurrentObjectFootprint();
+      if (footprint < ps.gpu_size()) footprint = ps.gpu_size();
+      *(size_t*)fpData = footprint;
+    }
 #endif
     if (_lb_args.metaLbOn())
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
@@ -2052,6 +2309,13 @@ CkLocRec::~CkLocRec()
 {
   if (deletedMarker != NULL)
     *deletedMarker = true;
+#if CMK_CUDA
+  // A move that will not pack now owes nothing, and gives its window place
+  // back. A packed payload keeps its place until the transport has read it,
+  // after this record is gone.
+  ckClearPendingPack(this);
+  ckWindowGiveBack(getID(), /*onlyIfUnpacked=*/true);
+#endif
 #if CMK_LBDB_ON
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
@@ -2308,6 +2572,26 @@ void CkLocRec::setObjReplica(int group, int rank, int count, int maxCount, size_
 void CkLocRec::recvMigrate(int toPe)
 {
   lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
+#if CMK_CUDA
+  // Its payload is owed from here: the admission check keeps it free. And
+  // under +gpupool it waits its turn in this PE's migration window, if it
+  // stages; a move already holding a place (a re-entry from the pump) goes
+  // straight on.
+  ckNotePendingPack(this);
+  if (ckWindowOn() && ck_window.inflight.find(getID()) == ck_window.inflight.end())
+  {
+    const size_t bytes = ckStagedBytes(this);
+    if (bytes > 0 && (!ck_window.queue.empty() || !ckWindowTake(getID(), bytes)))
+    {
+      CkMigrateWindow::Queued q;
+      q.mgr = myLocMgr;
+      q.id = getID();
+      q.toPe = toPe;
+      ck_window.queue.push_back(q);
+      return;
+    }
+  }
+#endif
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -2317,6 +2601,7 @@ void CkLocRec::recvMigrate(int toPe)
   else
     nextPe = toPe;
 }
+
 
 void CkLocRec::AsyncMigrate(bool use)
 {
@@ -2364,6 +2649,7 @@ void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
 {
 #if CMK_CUDA
   lbmgr->setGPUPupSize(ldHandle, obj_gpu_pup_size);
+  lbGpuPupSize = obj_gpu_pup_size;
 #endif
 }
 
@@ -3851,6 +4137,52 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
+#if CMK_CUDA
+// The streams of a staged device migration, one of each per PE, created on
+// first use. The pack copies go on the migration stream and the payload send
+// is ordered behind it; the unpack's copies go on the unpack stream. Both are
+// blocking streams, so like the legacy stream the copies used to go on, they
+// follow legacy-stream work. The arrival stream carries the transfer into a
+// receive arena and is non-blocking: arrivals do not queue behind each other
+// or behind unrelated legacy-stream work.
+static hapiStream_t ckMigrationStream()
+{
+  static thread_local hapiStream_t s = nullptr;
+  if (s == nullptr) hapiCheck(hapiStreamCreate(&s));
+  return s;
+}
+static hapiStream_t ckUnpackStream()
+{
+  static thread_local hapiStream_t s = nullptr;
+  if (s == nullptr) hapiCheck(hapiStreamCreate(&s));
+  return s;
+}
+static hapiStream_t ckArrivalStream()
+{
+  static thread_local hapiStream_t s = nullptr;
+  if (s == nullptr) hapiCheck(hapiStreamCreateWithFlags(&s, hapiStreamNonBlocking));
+  return s;
+}
+
+// Arena mode: the buffer the payload is received into becomes the arriving
+// element's storage, its pup_buffer_device pointers rebound into it
+// (PUP::fromMem::deviceRebind). On under +gpupool, where that buffer is a
+// pool block.
+static inline bool ckMigrateArenaMode() { return CkDevicePoolOn(); }
+
+// PUP::toMem::deviceSourceHook for the pack: a source in the device pool is
+// noted as read on the copy stream, so its free (the element's destructor
+// runs right after the pack) parks the block until the copy has read it. Any
+// other source clears *ctx, and emigrate waits for the copies on the host
+// before the element is destroyed.
+static void ckNotePackSource(void* ctx, const void* src, size_t bytes, void* stream)
+{
+  (void)bytes;
+  if (hapiDevPoolContains(src)) hapiDevPoolNoteRead(src, (hapiStream_t)stream);
+  else *(bool*)ctx = false;
+}
+#endif
+
 /// Migrate this local element away to another processor.
 void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 {
@@ -3876,6 +4208,23 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();
   const CmiUInt8 life = rec->getLife();  // rec is gone by the time the home is told
+
+#if CMK_CUDA
+  // What the element holds on the device now, before the pack frees it, as
+  // blocks: the destination's admission check takes exactly these on top of
+  // the receive arena, since the unpack allocates them again there.
+  std::vector<CmiUInt8> emigBlocks;
+  if (ckAdmissionOn())
+  {
+    std::vector<std::pair<size_t, int>> blocks;
+    hapiObjectBlocks(rec, blocks);
+    for (const auto& b : blocks)
+    {
+      emigBlocks.push_back((CmiUInt8)b.first);
+      emigBlocks.push_back((CmiUInt8)b.second);
+    }
+  }
+#endif
 
 #if CMK_OUT_OF_CORE
   /* Load in any elements that are out-of-core */
@@ -3908,14 +4257,24 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // First pass: find size of migration message
   size_t bufSize;
   size_t gpuBufSize = 0;
+  size_t nGpuBufs = 0;
   {
     PUP::sizer p(PUP::er::IS_MIGRATION);
     pupElementsFor(p, rec, CkElementCreation_migrate);
     bufSize = p.size();
 #if CMK_CUDA
     gpuBufSize = p.gpu_size();
+    nGpuBufs = p.gpu_buf_count();
 #endif
   }
+#if CMK_CUDA
+  if (gpuBufSize == 0)
+  {
+    // Nothing to pack after all: nothing owed, and no window place needed.
+    ckClearPendingPack(rec);
+    ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
+  }
+#endif
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
@@ -3926,6 +4285,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   void* gpuMsg = nullptr;
 #if CMK_CUDA
+  hapiStream_t migStream = nullptr;
   if (gpuBufSize > 0)
   {
     if (gpuBufSize > (size_t)std::numeric_limits<int>::max())
@@ -3935,14 +4295,35 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     // out, the element can be destroyed as soon as the pack below finishes,
     // and only this buffer has to survive until the destination has read it.
     // Handing the destination the element's own buffers instead would mean
-    // keeping the element alive across the transfer.
+    // keeping the element alive across the transfer. Under +gpupool hapiMalloc
+    // is the device pool. The block is the runtime's, not the departing
+    // element's.
+    hapiFootprintBegin(nullptr);
     hapiCheck(hapiMalloc(&gpuMsg, gpuBufSize));
+    hapiFootprintEnd();
+    // Packed: the floor no longer has to keep these bytes free, and the window
+    // place is given back once the transport has read the payload.
+    ckClearPendingPack(rec);
+    {
+      auto w = ck_window.inflight.find(id);
+      if (w != ck_window.inflight.end()) w->second.packed = true;
+    }
+    // The pack copies run on the migration stream, after everything already
+    // queued on the legacy stream -- the ordering the copies had when they
+    // were issued there.
+    migStream = ckMigrationStream();
+    static thread_local hapiEvent_t legacyDone = nullptr;
+    if (legacyDone == nullptr)
+      hapiCheck(hapiEventCreateWithFlags(&legacyDone, hapiEventDisableTiming));
+    hapiCheck(hapiEventRecord(legacyDone, (hapiStream_t)0));
+    hapiCheck(hapiStreamWaitEvent(migStream, legacyDone, 0));
   }
+  bool packSourcesAllPool = true;
 #endif
 
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
-      new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
+      new (bufSize, nGpuBufs, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
                                                     // The balancer counts the arrivals it ordered;
                                                     // a migrateMe is not one of them.
@@ -3951,10 +4332,25 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     false,
 #endif
                                                     bufSize,
-                                                    newEpoch, life, gpuBufSize > 0);
+                                                    newEpoch, life, gpuBufSize > 0,
+                                                    (int)nGpuBufs);
+#if CMK_CUDA
+  // An element with device state but nothing to copy out still allocates its
+  // blocks again at the destination, so it asks to be admitted like a payload
+  // does, without one.
+  const bool needsReservation = ckAdmissionOn() && gpuBufSize == 0 && !emigBlocks.empty();
+  msg->needsReservation = needsReservation;
+#endif
 
   {
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
+#if CMK_CUDA
+    p.gpuStream = (void*)migStream;
+    p.deviceManifestOut = msg->gpuManifest;
+    p.deviceManifestCap = nGpuBufs;
+    p.deviceSourceHook = ckNotePackSource;
+    p.deviceSourceCtx = &packSourcesAllPool;
+#endif
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3966,17 +4362,27 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
 #if CMK_CUDA
-    if (p.gpu_size() != gpuBufSize)
+    if (p.gpu_size() != gpuBufSize || p.deviceManifestIdx != nGpuBufs)
     {
       CkError(
-          "ERROR! Array element claimed it was %zu device bytes to a "
-          "sizing PUP::er, but copied %zu device bytes into the packing "
-          "PUP::er!\n",
-          gpuBufSize, p.gpu_size());
+          "ERROR! Array element claimed %zu device bytes in %zu buffers to a "
+          "sizing PUP::er, but copied %zu device bytes in %zu buffers into the "
+          "packing PUP::er!\n",
+          gpuBufSize, nGpuBufs, p.gpu_size(), p.deviceManifestIdx);
       CkAbort("Array element's pup routine has a device direction mismatch.\n");
     }
 #endif
   }
+
+#if CMK_CUDA
+  // The element is destroyed below, and its destructor frees the buffers the
+  // pack copies may still be reading. A device pool source was noted as read
+  // on the migration stream, so its free waits for the copy on the device; a
+  // source from anywhere else has no such ordering, and the host waits for
+  // the copies here.
+  if (gpuBufSize > 0 && !packSourcesAllPool)
+    hapiCheck(hapiStreamSynchronize(migStream));
+#endif
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
@@ -3991,8 +4397,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     // the running one at this point, and the payload belongs to the runtime
     // rather than to it. sendGPUMsg runs once this call has returned and the
     // element is gone.
-    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream,
+                                        std::move(emigBlocks));
     thisProxy[CkMyPe()].sendGPUMsg(id);
+  }
+  else if (needsReservation)
+  {
+    // Size 0: reserve the blocks, there is nothing to pull. The destination
+    // grants to itself and releases the element's own message.
+    thisProxy[toPe].requestArrival(id, 0, CkMyPe(), (int)emigBlocks.size(),
+                                   emigBlocks.data());
   }
 #endif
 
@@ -4060,6 +4474,13 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     bufferedHostMigrateMsgs[msg->id] = msg;
     return;
   }
+  // Device state but no payload: held until the admission check has reserved
+  // the element's blocks; admitArrivals releases it.
+  if (msg->needsReservation && grantedArrivals.find(msg->id) == grantedArrivals.end())
+  {
+    bufferedHostMigrateMsgs[msg->id] = msg;
+    return;
+  }
   immigrateWithDevice(msg);
 }
 
@@ -4077,6 +4498,18 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
     receivedDeviceMsgs.erase(it);
   }
   PUP::fromMem p(msg->packData, gpuData, PUP::er::IS_MIGRATION);
+  // Every device buffer of the unpack is checked against the sender's
+  // manifest. In arena mode pup_buffer_device rebinds into the receive arena
+  // instead of copying out of it; PUPMode::DEVICE buffers are still copied,
+  // on the unpack stream.
+  const bool gpuArena = msg->hasGPUMsg && ckMigrateArenaMode();
+  if (msg->hasGPUMsg)
+  {
+    p.deviceManifestIn = msg->gpuManifest;
+    p.deviceManifestCount = (size_t)msg->nGpuBufs;
+    p.deviceRebind = gpuArena;
+    p.gpuStream = (void*)ckUnpackStream();
+  }
 #else
   PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 #endif
@@ -4090,7 +4523,26 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
+#if CMK_CUDA
+  // What the unpack allocates is the arriving element's, though its entry
+  // method is not what is running, and it is served from the arrival set the
+  // admission check took for it, if any.
+  hapiFootprintBegin(rec);
+  {
+    auto ls = arrivalSets.find(msg->id);
+    hapiPreallocBegin(ls != arrivalSets.end() ? &ls->second : nullptr);
+  }
+#endif
   pupElementsFor(p, rec, CkElementCreation_migrate);
+#if CMK_CUDA
+  hapiPreallocEnd();
+  hapiFootprintEnd();
+  // A grant without a payload is retired here, once the element it was
+  // reserved for has unpacked (a payload's is retired by immigrateGPU taking
+  // its arena); then what the unpack did not take goes back.
+  if (msg->needsReservation) grantedArrivals.erase(msg->id);
+  releaseArrivalSet(msg->id);
+#endif
   bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
   if (zcRgetsActive)
   {
@@ -4114,10 +4566,37 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 #if CMK_CUDA
   if (msg->hasGPUMsg)
   {
-    // The element's own device buffers now hold copies of everything in the
-    // landed payload, so the landing buffer is finished with. The sender's
-    // staged copy is not this side's concern: its source callback releases it.
-    hapiCheck(hapiFree(gpuData));
+    // An unpack that asked for fewer device buffers than were packed is a
+    // direction mismatch too, one the per-buffer check cannot see.
+    if (p.deviceManifestIdx != p.deviceManifestCount)
+      CkAbort("Device pup direction mismatch: sender packed %zu device buffers "
+              "but the unpack consumed only %zu",
+              p.deviceManifestCount, p.deviceManifestIdx);
+    // The copies out of the receive arena finish before the element runs, and
+    // before the arena can be freed. Rebound buffers need no copy.
+    if (p.deviceManifestIdx > p.deviceReboundCount)
+      hapiCheck(hapiStreamSynchronize(ckUnpackStream()));
+    if (p.deviceReboundCount > 0)
+    {
+      // The arena is the element's storage now: hapiFreeMigratable of its
+      // last rebound buffer frees it. Its extent is the packed region's,
+      // recomputed from the manifest.
+      size_t extent = 0;
+      for (int i = 0; i < msg->nGpuBufs; ++i)
+        extent = PUP::alignDeviceOffset(extent) + msg->gpuManifest[i];
+      hapiArenaRegister(gpuData, extent, p.deviceReboundCount);
+      // And it is the element's footprint on this PE: charged to it, so the
+      // element does not read as holding nothing. Its free takes it back.
+      hapiFootprintCharge(gpuData, extent, rec);
+    }
+    else
+    {
+      // The element's own device buffers now hold copies of everything in
+      // the received payload, so the receive buffer is finished with. The
+      // sender's staged copy is not this side's concern: its source callback
+      // releases it.
+      hapiCheck(hapiFree(gpuData));
+    }
   }
 #endif
 
@@ -4136,14 +4615,55 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 ///
 /// CkCallback(CkCallbackFn, param) records the PE that built it and routes back
 /// there however far the buffer travelled, so this runs on the sending PE --
-/// the same context the old finishGPUSend entry method ran in. `param` is the
-/// staged pointer itself, which is why nothing has to be looked up here.
+/// the same context the old finishGPUSend entry method ran in. `param` names
+/// the staged block and the move, which is why nothing has to be looked up
+/// here but the location manager, to give the move's window place back.
+struct CkStagedPayload
+{
+  CkGroupID mgr;
+  CmiUInt8 id;
+  void* data;
+};
 static void gpuMigrateStagedFree(void* param, void* msg)
 {
-  hapiCheck(hapiFree(param));
+  CkStagedPayload* s = (CkStagedPayload*)param;
+  hapiCheck(hapiFree(s->data));
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(s->mgr);
+  if (mgr != nullptr) mgr->stagedPayloadSent(s->id);
+  delete s;
+}
+
+void CkLocMgr::stagedPayloadSent(CmiUInt8 id)
+{
+  ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
+  // The freed block may be what a held arrival on this PE waits for.
+  if (!heldArrivals.empty()) admitArrivals();
 }
 
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
+{
+  if (ckAdmissionOn())
+  {
+    // Ask to be admitted first; the payload waits in its block until the
+    // destination grants it.
+    const GPUMigrateData& gpuData = sendGPUBuffers.at(id);
+    thisProxy[gpuData.toPe].requestArrival(
+        id, (int)gpuData.size, CkMyPe(), (int)gpuData.blocks.size(),
+        const_cast<CmiUInt8*>(gpuData.blocks.data()));
+    return;
+  }
+  dispatchGPUMsg(id);
+}
+
+void CkLocMgr::arrivalGranted(CmiUInt8 id)
+{
+  if (sendGPUBuffers.find(id) == sendGPUBuffers.end())
+    CkAbort("PE %d: arrival granted for migration %llu, which has no payload here",
+            CkMyPe(), (unsigned long long)id);
+  dispatchGPUMsg(id);
+}
+
+void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
 {
   auto it = sendGPUBuffers.find(id);
   CmiAssert(it != sendGPUBuffers.end());
@@ -4153,10 +4673,166 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   // The staged block has to outlive this send -- the transport may still be
   // reading it -- but the zerocopy layer already reports exactly that, through
   // the buffer's source callback. Hand it ownership rather than keeping the
-  // entry alive and waiting for the destination to send an ack back.
+  // entry alive and waiting for the destination to send an ack back. The
+  // buffer names the stream the pack copied on, so the transport reads the
+  // block only after those copies.
+  CkStagedPayload* staged = new CkStagedPayload{ckGetGroupID(), id, gpuData.data};
   thisProxy[gpuData.toPe].immigrateGPU(
       id, (int)gpuData.size,
-      CkDeviceBuffer(gpuData.data, CkCallback(gpuMigrateStagedFree, gpuData.data)));
+      CkDeviceBuffer(gpuData.data, CkCallback(gpuMigrateStagedFree, staged),
+                     (hapiStream_t)gpuData.stream));
+}
+
+// Destination: grant the arrival now, or hold it until the pool can take it
+// above the floor.
+void CkLocMgr::requestArrival(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks)
+{
+  HeldArrival d;
+  d.id = id;
+  d.size = size;
+  d.srcPe = srcPe;
+  d.blocks.assign(blocks, blocks + n);
+  d.footprint = 0;
+  for (int k = 0; k + 1 < n; k += 2) d.footprint += (size_t)blocks[k] * (size_t)blocks[k + 1];
+  d.since = CkWallTimer();
+  heldArrivals.push_back(d);
+  admitArrivals();
+}
+
+// The admitted element has unpacked, served from its arrival set. Whatever it
+// did not take -- everything, for an element that rebound its buffers into
+// the arena -- goes back to the pool, where a held arrival may fit now.
+void CkLocMgr::releaseArrivalSet(CmiUInt8 id)
+{
+  auto it = arrivalSets.find(id);
+  if (it == arrivalSets.end()) return;
+  for (auto& e : it->second) CkDeviceFree(e.second);
+  arrivalSets.erase(it);
+  if (!heldArrivals.empty()) admitArrivals();
+}
+
+// Not re-entrant: the loop holds a reference into heldArrivals while it
+// takes memory and sends the grant, and a nested call -- a free that admits --
+// would pop that entry from under it, granting it twice. A nested call only
+// asks the running loop for another round.
+void CkLocMgr::admitArrivals()
+{
+  if (admittingArrivals)
+  {
+    admitArrivalsAgain = true;
+    return;
+  }
+  admittingArrivals = true;
+  do
+  {
+    admitArrivalsAgain = false;
+    admitArrivalsLoop();
+  } while (admitArrivalsAgain && !heldArrivals.empty());
+  admittingArrivals = false;
+}
+
+void CkLocMgr::admitArrivalsLoop()
+{
+  // A held arrival is tried again after this long, from the scheduler.
+  auto scheduleRetry = [this]() {
+    if (arrivalRetryScheduled) return;
+    arrivalRetryScheduled = true;
+    CcdCallFnAfter(
+        [](void* mgr, double) {
+          CkLocMgr* m = (CkLocMgr*)mgr;
+          m->arrivalRetryScheduled = false;
+          m->admitArrivals();
+        },
+        this, 2.0);
+  };
+  // Strictly in arrival order: a large arrival is not starved by smaller ones
+  // taking the bytes it waits for.
+  while (!heldArrivals.empty())
+  {
+    HeldArrival& d = heldArrivals.front();
+    size_t reach = 0, floor = 0;
+    // An arrival that has waited this long is past anything the plan accounted
+    // for -- memory another allocation took, or a cycle of payloads each
+    // waiting on the other's arrival. It is taken anyway: the allocation then
+    // succeeds or fails as it would with no admission check, rather than
+    // hanging the job.
+    static const double timeout = 120.0;
+    const bool expired = (CkWallTimer() - d.since) > timeout;
+    if (expired && !d.warned)
+      CkPrintf("[%d] WARNING: admitting a %d-byte migration arrival (+%zu bytes of "
+               "element state) after %.0f s without the admission check's guarantee\n",
+               CkMyPe(), d.size, d.footprint, timeout);
+    if (!expired && !ckArrivalAdmissible((size_t)d.size, d.footprint, &reach, &floor))
+    {
+      const double waited = CkWallTimer() - d.since;
+      if (!d.reported && arrivalHolds++ == 0)
+        CkPrintf("[%d] memory contract: a migration arrival waits for device memory "
+                 "(admission check)\n", CkMyPe());
+      d.reported = true;
+      if (waited > 30.0 && !d.warned)
+      {
+        d.warned = true;
+        CkPrintf("[%d] WARNING: a %d-byte migration arrival (+%zu bytes of element "
+                 "state) has waited %.0f s for device memory (pool free %zu, owed packs "
+                 "%zu). The balancer planned this step against more memory than the "
+                 "pool has now.\n",
+                 CkMyPe(), d.size, d.footprint, waited, reach, floor);
+      }
+      scheduleRetry();
+      return;
+    }
+    // Admissible by bytes: now take the arena and the element's blocks for
+    // real, without growing the pool. By shape they may still not fit, which
+    // the byte check cannot see; a vmm pool then maps what it is short of,
+    // and otherwise this waits, like any other held arrival, for a free.
+    char* arena = nullptr;
+    std::multimap<size_t, void*> set;
+    bool taken = expired || ckTakeArrivalSet(d.size, d.blocks, &arena, set);
+    if (!taken && ckTakeArrivalSetGrowingVmm(d.size, d.footprint, d.blocks, &arena, set))
+      taken = true;
+    if (!taken)
+    {
+      if (!d.reported && arrivalHolds++ == 0)
+        CkPrintf("[%d] memory contract: a migration arrival waits for device memory "
+                 "(admission check)\n", CkMyPe());
+      d.reported = true;
+      scheduleRetry();
+      return;
+    }
+    if (expired && d.size > 0)
+    {
+      // Past the timeout: the arena the plain way, growing the pool if it
+      // must; the element's unpack then allocates for itself.
+      hapiFootprintBegin(nullptr);
+      arena = (char*)CkDeviceMalloc((size_t)d.size);
+      hapiFootprintEnd();
+    }
+    const CmiUInt8 id = d.id;
+    const int size = d.size;
+    const int srcPe = d.srcPe;
+    grantedArrivals[id] = arena;
+    if (!set.empty()) arrivalSets[id] = std::move(set);
+    heldArrivals.pop_front();
+    if (size == 0)
+    {
+      // Nothing to pull: this grant only reserves the arriving element's
+      // blocks, and the element's own message is what waits for it. Released
+      // through the scheduler, since immigrate() ends in releaseArrivalSet,
+      // which admits. If the grant beat the message, immigrate() finds the id
+      // in grantedArrivals when it arrives.
+      auto h = bufferedHostMigrateMsgs.find(id);
+      if (h != bufferedHostMigrateMsgs.end())
+      {
+        CkArrayElementMigrateMessage* m = h->second;
+        bufferedHostMigrateMsgs.erase(h);
+        thisProxy[CkMyPe()].immigrate(m);
+      }
+    }
+    else
+    {
+      thisProxy[srcPe].arrivalGranted(id);
+    }
+  }
 }
 
 /// Post variant: supply the device buffer the payload should land in. The
@@ -4171,10 +4847,26 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data,
                             CkDeviceBufferPost* post)
 {
-  void* landing = nullptr;
-  hapiCheck(hapiMalloc(&landing, (size_t)size));
-  data = (char*)landing;
-  postedDeviceBuffers[id] = landing;
+  // Under +gpupool hapiMalloc is the device pool, and the receive buffer is
+  // the arena the arriving element's buffers are rebound into: taken when the
+  // admission check granted the arrival, or here. Charged to nobody here; the
+  // unpack charges it to the element it becomes storage for.
+  void* recvBuf = nullptr;
+  auto granted = grantedArrivals.find(id);
+  if (granted != grantedArrivals.end())
+  {
+    recvBuf = granted->second;
+    grantedArrivals.erase(granted);
+  }
+  if (recvBuf == nullptr)
+  {
+    hapiFootprintBegin(nullptr);
+    hapiCheck(hapiMalloc(&recvBuf, (size_t)size));
+    hapiFootprintEnd();
+  }
+  if (ckMigrateArenaMode()) post[0].hapi_stream = ckArrivalStream();
+  data = (char*)recvBuf;
+  postedDeviceBuffers[id] = recvBuf;
 }
 
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
