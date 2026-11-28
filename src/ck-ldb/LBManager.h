@@ -43,6 +43,8 @@ class CkLBArgs
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
+  bool _lb_async;          // AtSyncStart returns without waiting for the step
+  bool _lb_asyncFromFlag;  // +LBAsync was on the command line, so CkLBSetAsync changes nothing
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
@@ -76,6 +78,8 @@ class CkLBArgs
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
+    _lb_async = false;
+    _lb_asyncFromFlag = false;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
@@ -100,6 +104,8 @@ class CkLBArgs
   inline double& beta() { return _lb_beta; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
+  inline bool& lbAsync() { return _lb_async; }
+  inline bool& asyncFromFlag() { return _lb_asyncFromFlag; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
@@ -145,6 +151,13 @@ class CkLBOptions
 #include "LBManager.decl.h"
 
     extern CkGroupID _lbmgr;
+
+// Turns asynchronous balancing (+LBAsync) on or off from the application, for
+// an application written to the split barrier (AtSyncStart / AtSyncWait), so
+// it need not be passed on the command line. Call it from a main chare before
+// the first balancing step; it reaches every PE. With +LBAsync on the command
+// line it changes nothing.
+void CkLBSetAsync(bool on);
 
 CkpvExtern(bool, lbmanagerInited);
 
@@ -266,8 +279,18 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
+  int resume_epoch = 0;
+
  public:
   int chare_count;
+
+  // Number of load balancing steps whose clients this PE has resumed. Under
+  // +LBSyncResume -- which +LBAsync forces on -- the resume is driven by a
+  // global reduction, so this advances in lockstep everywhere and is
+  // comparable across PEs. An element stopped in AtSyncWait() records the value
+  // it is waiting past, which is how one that gets migrated by the very step it
+  // is waiting on can tell, on arrival, that its destination already resumed.
+  int resumeEpoch() const { return resume_epoch; }
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -528,6 +551,7 @@ class LBManager : public CBase_LBManager
 
   void LocalBarrierOn(void);
   void LocalBarrierOff(void);
+  void setAsyncMode(bool on);  // entry: see CkLBSetAsync
   void ResumeClients();
   static int ProcessorSpeed();
   static void SetLBPeriod(double period)

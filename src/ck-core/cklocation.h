@@ -115,6 +115,9 @@ public:
   CkArrayIndex idx;    // Array index that is migrating
   CmiUInt8 id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
+  // The balancer ordered this move but does not hold its migration barrier for
+  // the arrival (AtSync(0)); it counts such arrivals apart from the others.
+  bool asyncArrival = false;
   int length;          // Size in bytes of the packed data
   int epoch;
   CmiUInt8 life;       // the element's life tag (CkLocEntry::life)

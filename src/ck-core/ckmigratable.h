@@ -15,6 +15,15 @@ private:
     LOAD_BALANCE
   } local_state;
   bool can_reset;
+  // +LBAsync state. lbStepPending is set when AtSyncStart joins a step and
+  // cleared when that step resumes clients here; waitParked records that
+  // AtSyncWait found the step still running and stopped the element. lbWaitEpoch
+  // is the LBManager resume epoch the element is waiting past, which lets an
+  // element migrated by the very step it waits on notice, on arrival, that its
+  // destination has already resumed. All three are pupped across migration.
+  bool lbStepPending;
+  bool waitParked;
+  int lbWaitEpoch;
 protected:
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
@@ -87,11 +96,59 @@ public:
 #endif
 
 #if CMK_LBDB_ON  //For load balancing:
+  // AtSyncStart() followed by AtSyncWait(): the element stops until the step
+  // is over. Unlike AtSyncStart, AtSync may be called again before the step's
+  // resume -- the element joins the next step too and is resumed once per step.
   void AtSync(int waitForMigration=1);
+
+  // The first half of AtSync. It joins the load balancing step when one is due
+  // and reports what it did:
+  //   Continue -- no step at this call; carry on iterating.
+  //   Started  -- this call joined the step.
+  //   Blocked  -- MetaBalancer has not yet settled when this element joins.
+  //               It is stopped: do not iterate, do not call AtSyncStart
+  //               again. It is resumed through ResumeFromSync, or joined for
+  //               you, once that is decided.
+  // Without +LBAsync a joined element waits for ResumeFromSync, as under
+  // AtSync. With +LBAsync it returns to its caller and keeps running while the
+  // strategy and the migrations proceed; AtSyncWait() is where it finds out
+  // the step is over. A step must be waited out before the next AtSyncStart:
+  // calling it with the previous step still in flight aborts.
+  enum class AtSyncStatus { Continue, Started, Blocked };
+  AtSyncStatus AtSyncStart(int waitForMigration=1);
+
+  // The second half. If the step this element joined is still in flight, it
+  // stops the element until the step is over -- under +LBAsync, until every
+  // migration the step planned, on every PE, has completed -- and the element
+  // is then handed back through ResumeFromSync(). If no step was joined, or the
+  // step is already over, it calls ResumeFromSync() inline. Either way the
+  // element is resumed exactly once per AtSyncStart(), so an application
+  // written to the split pattern runs correctly with or without +LBAsync.
+  void AtSyncWait();
+
+  // True when the next AtSyncStart() will actually join a step, so an
+  // application can do its pre-migration work -- draining device streams, say
+  // -- only on the iterations where that work is needed.
+  bool AtSyncPending() const;
+
+  // True while this element owes AtSyncWait() to a step it has already joined,
+  // including a step it was joined into by the runtime after AtSyncStart
+  // returned Blocked: the application cannot see that join itself.
+  bool AtSyncStepInFlight() const { return lbStepPending; }
+
+  // Release an element that stopped in AtSyncWait() and was then migrated by
+  // the step it was waiting on, arriving after its destination had already
+  // resumed. Called from the migration arrival paths in CkLocMgr.
+  void lbCheckWaitRelease();
+
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
 private:
   void ResumeFromSyncHelper();
+  AtSyncStatus lbStart(int waitForMigration, bool split);
+  void lbJoinStep(int waitForMigration);
+  void recordLBSizes();
+  void sampleMetaLBLoad();
 public:
 
   void ReadyMigrate(bool ready);
@@ -101,6 +158,12 @@ public:
   void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
+  enum class AtSyncStatus { Continue, Started, Blocked };
+  AtSyncStatus AtSyncStart(int waitForMigration=1) { return AtSyncStatus::Continue; }
+  void AtSyncWait() { ResumeFromSync(); }
+  bool AtSyncPending() const { return false; }
+  bool AtSyncStepInFlight() const { return false; }
+  void lbCheckWaitRelease() { }
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
   void setGPUPupSize(size_t obj_gpu_pup_size) { }

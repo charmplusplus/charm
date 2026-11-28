@@ -21,6 +21,10 @@ void LBObjLoadsCcsHandler(char* msg);
 #include <atomic>
 
 CkGroupID _lbmgr;
+// CkLBSetAsync called before the LBManager group exists (see LBMgrInit):
+// remembered here and broadcast once it does.
+static bool lbmgrCreated = false;
+static int pendingAsyncRequest = -1;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
@@ -152,6 +156,11 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 {
 #if CMK_LBDB_ON
   _lbmgr = CProxy_LBManager::ckNew();
+  lbmgrCreated = true;
+  // An application main chare that ran before this one asked for asynchronous
+  // balancing: tell every PE now that the group exists.
+  if (pendingAsyncRequest >= 0)
+    CProxy_LBManager(_lbmgr).setAsyncMode(pendingAsyncRequest != 0);
 
   // runtime specified load balancer
   if (!lbRegistry.runtime_lbs.empty())
@@ -373,9 +382,21 @@ void _loadbalancerInit()
                         "Write to File: Load Balancing Object to Processor Map decisions "
                         "during LB Simulation");
 
+  // Asynchronous load balancing: AtSyncStart() returns without waiting for the
+  // step it joins, and AtSyncWait() is the separate rendezvous for its
+  // completion.
+  _lb_args.lbAsync() = CmiGetArgFlagDesc(
+      argv, "+LBAsync",
+      "AtSyncStart returns immediately; AtSyncWait waits for the step's migrations");
+  _lb_args.asyncFromFlag() = _lb_args.lbAsync();
+
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
       argv, "+LBSyncResume", "LB performs a barrier after migration is finished");
+  // AtSyncWait() means "every migration this step planned, everywhere, is
+  // done". Only the sync-resume reduction gives that; a per-PE resume would let
+  // a waiter return while other PEs were still moving objects.
+  if (_lb_args.lbAsync()) _lb_args.syncResume() = true;
 
   // both +LBDebug and +LBDebug level should work
   if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(),
@@ -492,6 +513,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSimProcs");
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
+  _registerCommandLineOpt("+LBAsync");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
@@ -824,6 +846,35 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
   loadbalancers[seq] = lb;
 }
 
+// Asynchronous balancing requested by the application (CkLBSetAsync). What
+// +LBAsync implies at startup is derived here the same way. _lb_args is shared
+// by every PE of the process, so one branch per process would do, but every
+// branch runs it so the order of arrival does not matter.
+static void lbApplyAsync(bool on)
+{
+  if (_lb_args.asyncFromFlag()) return;  // the command line already decided
+  _lb_args.lbAsync() = on;
+  if (on) _lb_args.syncResume() = true;
+}
+
+void LBManager::setAsyncMode(bool on) { lbApplyAsync(on); }
+
+void CkLBSetAsync(bool on)
+{
+  // This process at once (its PEs share _lb_args), every other PE by broadcast
+  // once the group exists.
+  lbApplyAsync(on);
+  if (CkMyPe() == 0)
+    CmiPrintf("CharmLB> asynchronous balancing %s by the application%s\n", on ? "on" : "off",
+              _lb_args.asyncFromFlag() ? " (ignored: +LBAsync was given)" : "");
+#if CMK_LBDB_ON
+  if (lbmgrCreated)
+    CProxy_LBManager(_lbmgr).setAsyncMode(on);
+  else
+    pendingAsyncRequest = on ? 1 : 0;
+#endif
+}
+
 // switch strategy in order
 void LBManager::nextLoadbalancer(int seq)
 {
@@ -975,6 +1026,7 @@ void LBManager::ResetAdaptive()
 void LBManager::ResumeClients()
 {
 #if CMK_LBDB_ON
+  resume_epoch++;
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)

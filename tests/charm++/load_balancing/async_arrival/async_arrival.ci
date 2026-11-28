@@ -1,0 +1,16 @@
+mainmodule async_arrival {
+
+  readonly CProxy_Main mainProxy;
+  readonly int num_elements;
+
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry [reductiontarget] void stepDone(int maxResumes, int negMinResumes);
+  };
+
+  array [1D] Blk {
+    entry Blk(int split, int wait);
+    entry void run();
+    entry void waitForStep();
+  };
+};

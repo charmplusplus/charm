@@ -16,6 +16,18 @@ void DistBaseLB::barrierDone() {
   }
   lb_started = true;
 
+  // Hold the AtSync barrier down for the duration of the step, as CentralLB
+  // does. This is what makes the framework one step at a time: while a step is
+  // registering, the barrier cannot fire, so no element can start the next
+  // one. Under the unsplit AtSync that never mattered, because the elements
+  // stayed stopped for the whole step; under +LBAsync they keep running.
+  // Released in ResumeClients.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->RegisteringObjects(h);
+  }
+
   start_lb_time = 0;
 
   if (CkNumPes() == 1) {
@@ -210,6 +222,17 @@ void DistBaseLB::ResumeClients(int balancing) {
   }
 
   lbmgr->ResumeClients();
+
+  // Release the barrier only after the clients have been resumed, matching
+  // CentralLB::CheckMigrationComplete: turning it on any earlier would let an
+  // element still running under +LBAsync start the next step while this one
+  // was finishing. Unconditional, to pair with the RegisteringObjects in
+  // barrierDone: every step reaches here once, the one-PE path included.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->DoneRegisteringObjects(h);
+  }
 #endif
 }
 
