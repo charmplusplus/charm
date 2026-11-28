@@ -1591,12 +1591,32 @@ void CkMigratable::commonInit(void)
   waitParked = false;
   lbWaitEpoch = 0;
   lbMeasurementClosed = false;
+  lbStepSeen = 0;
+  lbIterNo = 0;
+  lbStepBlocked = false;
+  metaLBStreamJoinedPe = -1;
 
 #if CMK_LBDB_ON
+  // Join whatever step this PE has already been asked for rather than trying
+  // to start it: an element created (or arriving) mid-step would otherwise
+  // reach the barrier for an epoch whose local barrier has already fired.
+  lbStepSeen = CkpvAccess(_lbStepRequested);
   if (_lb_args.metaLbOn())
   {
-    atsync_iteration = myRec->getMetaBalancer()->get_iteration();
-    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    if (_lb_args.metaLbGpuTrigger())
+    {
+      // Under the GPU trigger the element joins its PE's sample stream at its
+      // first sample, not here (sampleMetaLBLoad): joining records the sample
+      // index it will first contribute to, which is true only of the instant
+      // it is done, and an element that arrives while its new PE keeps
+      // sampling would otherwise record an index already in the past.
+      atsync_iteration = -1;
+    }
+    else
+    {
+      atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+      myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    }
   }
 #endif
 }
@@ -1647,6 +1667,9 @@ void CkMigratable::pup(PUP::er& p)
     p | waitParked;
     p | lbWaitEpoch;
     p | lbMeasurementClosed;
+    p | lbStepSeen;
+    p | lbIterNo;
+    p | lbStepBlocked;
     if (p.isUnpacking()) lbSetMeasurementClosed(lbMeasurementClosed);
   }
 
@@ -1697,7 +1720,9 @@ CkMigratable::~CkMigratable()
       myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
   }
 
-  if (_lb_args.metaLbOn())
+  // Under the GPU trigger atsync_iteration == -1 means this element never
+  // joined its PE's sample stream, so no sample is waiting on it.
+  if (_lb_args.metaLbOn() && (!_lb_args.metaLbGpuTrigger() || atsync_iteration != -1))
   {
     myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
   }
@@ -1757,7 +1782,10 @@ void CkMigratable::clearMetaLBData()
 {
   //  if (can_reset) {
   local_state = OFF;
-  atsync_iteration = -1;
+  // The GPU trigger's sample stream runs free across balancing steps: every
+  // PE completes every sample index in order. Resetting the counter here would
+  // make this element contribute again to indices its PE has already closed.
+  if (!_lb_args.metaLbGpuTrigger()) atsync_iteration = -1;
   prev_load = 0.0;
   can_reset = false;
   //  }
@@ -1765,6 +1793,39 @@ void CkMigratable::clearMetaLBData()
 
 void CkMigratable::recvLBPeriod(void* data)
 {
+  if (_lb_args.metaLbGpuTrigger())
+  {
+    // The GPU trigger schedules on lbIterNo, not on a predicted period, so
+    // none of the state machine below applies. This is the agreed count
+    // arriving: an element stopped at the tentative floor either joins now,
+    // or is let go to keep iterating up to the count.
+    if (!lbStepBlocked) return;
+    lbStepBlocked = false;
+    const int agreed = *((int*)data);
+    if (lbIterNo >= agreed)
+    {
+      if (_lb_args.lbAsync())
+      {
+        // Joining never stops an element under +LBAsync, and its AtSyncStart
+        // already returned, so it is handed back to the application here; it
+        // owes AtSyncWait to the step (AtSyncStepInFlight).
+        lbJoinStep(1);
+        ResumeFromSync();
+      }
+      else
+      {
+        // Stopped, as in AtSyncWait, so the step's resume hands it back --
+        // set before the join, which can finish the step inside the call.
+        waitParked = true;
+        lbJoinStep(1);
+      }
+    }
+    else
+    {
+      ResumeFromSync();
+    }
+    return;
+  }
   if (atsync_iteration < 0)
   {
     return;
@@ -1874,6 +1935,28 @@ void CkMigratable::sampleMetaLBLoad()
     can_reset = false;
     local_state = OFF;
     prev_load = 0.0;
+    if (_lb_args.metaLbGpuTrigger())
+    {
+      // Join the stream where this PE is now. AdjustCountForNewContributor
+      // credits the samples still open here, which are exactly the ones this
+      // element skips -- so they can complete without it -- and the one it
+      // is about to open is the first it owes.
+      atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+      myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+      metaLBStreamJoinedPe = CkMyPe();
+    }
+  }
+  else if (_lb_args.metaLbGpuTrigger() && metaLBStreamJoinedPe != CkMyPe())
+  {
+    // Arrived from another PE, carrying that PE's sample index. Streams
+    // advance per PE, so the index can already be behind this one; join where
+    // this PE is, and credit its open samples for a contributor they were not
+    // counting, exactly as for a new element. The source's stream let go of
+    // the element when it was destroyed there (~CkMigratable).
+    const int here = myRec->getMetaBalancer()->get_iteration();
+    if (atsync_iteration < here) atsync_iteration = here;
+    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    metaLBStreamJoinedPe = CkMyPe();
   }
 
   atsync_iteration++;
@@ -1891,6 +1974,10 @@ void CkMigratable::sampleMetaLBLoad()
     current_load = myRec->getObjTime();
   }
 
+  // A step's ClearLoads can fall inside a sample window, restarting the object
+  // timer below the reading this element last took.
+  if (current_load < 0.0) current_load = 0.0;
+
   if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration())
   {
     CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n", CkMyPe(),
@@ -1905,11 +1992,37 @@ void CkMigratable::sampleMetaLBLoad()
   }
 }
 
+// Contribute this element's load to MetaBalancer without joining anything.
+// Called every few iterations: on CUDA it is the expensive half (the PE's
+// sample builds the process's GPU loads once per sample index).
+void CkMigratable::AtSyncSample()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncSample!\n");
+  // No balancer is listening, or MetaBalancer is off and nothing consumes the
+  // sample: a no-op, so applications can call it unconditionally.
+  if (!_lb_args.metaLbOn() || !myRec->getSyncBarrier()->hasReceivers()) return;
+
+  ckFinishConstruction();
+  recordLBSizes();
+  sampleMetaLBLoad();
+}
+
 bool CkMigratable::AtSyncPending() const
 {
   if (!usesAtSync || !myRec->getSyncBarrier()->hasReceivers()) return false;
   // Without MetaBalancer every AtSyncStart joins a step, so one is always due.
   if (!_lb_args.metaLbOn()) return true;
+  if (_lb_args.metaLbGpuTrigger())
+  {
+    // A step is agreed, and this element's next AtSyncStart is the one it was
+    // agreed for: a step can be requested many iterations before its count.
+    if (CkpvAccess(_lbStepRequested) <= lbStepSeen) return false;
+    const int agreed = CkpvAccess(_lbStepPeriod);
+    return agreed > 0 && lbIterNo + 1 >= agreed;
+  }
   bool is_tentative;
   return atsync_iteration + 1 >=
          myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative);
@@ -1945,6 +2058,32 @@ CkMigratable::AtSyncStatus CkMigratable::lbStart(int waitForMigration, bool spli
         "AtSyncStart() called while the load balancing step this element started "
         "is still in flight. Every AtSyncStart() must be followed by an "
         "AtSyncWait() before the next one.\n");
+
+  if (_lb_args.metaLbOn() && _lb_args.metaLbGpuTrigger())
+  {
+    // The application calls this on a fixed cadence, so this counter is the
+    // clock every element agrees on. It advances on every call, including the
+    // calls with no step to join, or the counts drift apart.
+    ++lbIterNo;
+    myRec->getMetaBalancer()->reportStartNo(lbIterNo);
+
+    if (CkpvAccess(_lbStepRequested) <= lbStepSeen) return AtSyncStatus::Continue;
+
+    const int agreed = CkpvAccess(_lbStepPeriod);
+    if (agreed == 0)
+    {
+      // A step has been called for but its count is still being agreed. Run
+      // up to the tentative floor and stop there. Stopping is the mechanism:
+      // it bounds how far any element can get before the count is settled, so
+      // the agreed count is one no element has passed.
+      if (lbIterNo < CkpvAccess(_lbStepTentative)) return AtSyncStatus::Continue;
+      lbStepBlocked = true;
+      return AtSyncStatus::Blocked;
+    }
+    if (lbIterNo < agreed) return AtSyncStatus::Continue;
+    lbJoinStep(waitForMigration);
+    return AtSyncStatus::Started;
+  }
 
   if (_lb_args.metaLbOn())
   {
@@ -1988,6 +2127,7 @@ CkMigratable::AtSyncStatus CkMigratable::lbStart(int waitForMigration, bool spli
 // The tail of a step join.
 void CkMigratable::lbJoinStep(int waitForMigration)
 {
+  if (_lb_args.metaLbOn()) lbStepSeen = CkpvAccess(_lbStepRequested);
   myRec->AsyncMigrate(!waitForMigration);
   // Migratable straight away, in both modes. An element that keeps running
   // under +LBAsync can still be moved at any entry-method boundary, because

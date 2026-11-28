@@ -9,7 +9,7 @@ mainmodule async_arrival {
   };
 
   array [1D] Blk {
-    entry Blk(int split, int wait);
+    entry Blk(int split, int wait, int sample);
     entry void run();
     entry void waitForStep();
   };

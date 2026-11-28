@@ -34,6 +34,9 @@ CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
+CkpvDeclare(int, _lbStepRequested);
+CkpvDeclare(int, _lbStepPeriod);
+CkpvDeclare(int, _lbStepTentative);
 
 extern int quietModeRequested;
 
@@ -202,6 +205,13 @@ void _loadbalancerInit()
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
 
+  CkpvInitialize(int, _lbStepRequested);
+  CkpvAccess(_lbStepRequested) = 0;
+  CkpvInitialize(int, _lbStepPeriod);
+  CkpvAccess(_lbStepPeriod) = 0;
+  CkpvInitialize(int, _lbStepTentative);
+  CkpvAccess(_lbStepTentative) = 0;
+
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
   CkpvAccess(_lb_obj_index) = -1;
@@ -216,6 +226,11 @@ void _loadbalancerInit()
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
   CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
                       "Use this directory to read model for MetaLB");
+  _lb_args.metaLbGpuTrigger() = CmiGetArgFlagDesc(
+      argv, "+MetaLBGpuTrigger", "MetaBalancer triggers on per-device GPU load imbalance");
+  CmiGetArgDoubleDesc(argv, "+MetaLBGpuTolerance", &_lb_args.metaLbGpuTolerance(),
+                      "max/avg GPU device load above which MetaLB balances");
+  if (_lb_args.metaLbGpuTolerance() <= 1.0) _lb_args.metaLbGpuTolerance() = 1.1;
 
   if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr)
   {
@@ -549,6 +564,8 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
+  _registerCommandLineOpt("+MetaLBGpuTrigger");
+  _registerCommandLineOpt("+MetaLBGpuTolerance");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
 }

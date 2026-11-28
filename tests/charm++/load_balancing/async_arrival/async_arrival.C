@@ -1,7 +1,12 @@
 // Load balancing steps through AtSync and through the split barrier
 // (AtSyncStart / AtSyncWait), with and without +LBAsync, over several steps.
 //
-//   ./async_arrival <steps> <split> <wait> [+LBAsync] [+balancer ...]
+//   ./async_arrival <steps> <split> <wait> [sample] [+LBAsync] [+balancer ...]
+//
+// sample = 1: AtSyncSample() before every AtSyncStart, MetaBalancer's sampling
+//            hook. With +MetaLB +MetaLBGpuTrigger and no GPU the trigger never
+//            fires, so this runs the GPU trigger's sample stream and its
+//            per-iteration count, and no step is ever joined.
 //
 // split = 0: each step is AtSync(wait).
 // split = 1: each step is AtSyncStart(wait); the element keeps receiving
@@ -56,13 +61,14 @@ public:
     num_steps = (msg->argc > 1) ? atoi(msg->argv[1]) : 4;
     const int split = (msg->argc > 2) ? atoi(msg->argv[2]) : 0;
     const int wait = (msg->argc > 3) ? atoi(msg->argv[3]) : 0;
+    const int sample = (msg->argc > 4) ? atoi(msg->argv[4]) : 0;
     delete msg;
 
     mainProxy = thisProxy;
     num_elements = CkNumPes() * OBJS_PER_PE;
-    blocks = CProxy_Blk::ckNew(split, wait, num_elements);
-    CkPrintf("[TEST] %d elements, %d steps, split=%d wait=%d\n", num_elements, num_steps,
-             split, wait);
+    blocks = CProxy_Blk::ckNew(split, wait, sample, num_elements);
+    CkPrintf("[TEST] %d elements, %d steps, split=%d wait=%d sample=%d\n", num_elements,
+             num_steps, split, wait, sample);
     CcdCallFnAfter(watchdog, this, 60000);
     blocks.run();
   }
@@ -90,7 +96,7 @@ public:
 
 class Blk : public CBase_Blk
 {
-  int split, wait;
+  int split, wait, sample;
   int stamp;  // must survive migration unchanged
   int resumes;
   bool joined = false;  // this step's AtSyncStart joined a step
@@ -104,7 +110,8 @@ class Blk : public CBase_Blk
   }
 
 public:
-  Blk(int split_, int wait_) : split(split_), wait(wait_), stamp(thisIndex * 7 + 3), resumes(0)
+  Blk(int split_, int wait_, int sample_)
+      : split(split_), wait(wait_), sample(sample_), stamp(thisIndex * 7 + 3), resumes(0)
   {
     usesAtSync = true;
     usesAutoMeasure = false;
@@ -113,6 +120,7 @@ public:
 
   void run()
   {
+    if (sample) AtSyncSample();
     if (!split)
     {
       AtSync(wait);
@@ -174,6 +182,7 @@ public:
     CBase_Blk::pup(p);
     p | split;
     p | wait;
+    p | sample;
     p | stamp;
     p | resumes;
     p | joined;

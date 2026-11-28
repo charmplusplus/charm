@@ -53,6 +53,8 @@ class CkLBArgs
   bool _lb_peerDecision;   // scatter a centralized decision instead of broadcasting it
   int _lb_scatterThreshold;  // spans of at most this many PEs get a broadcast, not a scatter
   bool _lb_metaLbOn;
+  bool _lb_metaLbGpuTrigger;  // MetaLB: trigger on per-device GPU imbalance
+  double _lb_metaLbGpuTol;    // MetaLB: max/avg device load that triggers
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
   int _lb_percentMovesAllowed;  // for the greedy-refine balancers, as a
@@ -90,6 +92,8 @@ class CkLBArgs
     _lb_peerDecision = false;
     _lb_scatterThreshold = 32;
     _lb_metaLbOn = false;
+    _lb_metaLbGpuTrigger = false;
+    _lb_metaLbGpuTol = 1.1;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
     _lb_greedyRefineTolerance = 1.1;  // 10% over greedy; <=0 searches instead
@@ -118,6 +122,8 @@ class CkLBArgs
   inline bool& lbPeerDecision() { return _lb_peerDecision; }
   inline int& scatterThreshold() { return _lb_scatterThreshold; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
+  inline bool& metaLbGpuTrigger() { return _lb_metaLbGpuTrigger; }
+  inline double& metaLbGpuTolerance() { return _lb_metaLbGpuTol; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
   inline double& greedyRefineTolerance() { return _lb_greedyRefineTolerance; }
@@ -171,6 +177,24 @@ class CkLBOptions
 void CkLBSetAsync(bool on);
 
 CkpvExtern(bool, lbmanagerInited);
+
+// Sequence number of the most recent balancing step MetaBalancer's GPU trigger
+// has requested on this PE, or 0. Monotonic: an element joins a step when this
+// rises above the sequence it last joined, so the check in AtSyncStart is one
+// read of a PE-private int and can run on every application iteration.
+CkpvExtern(int, _lbStepRequested);
+
+// The value of CkMigratable::lbIterNo at which the requested step is joined,
+// agreed across all PEs before it is broadcast (0 while still being agreed),
+// so every element enters the step at the same application iteration.
+CkpvExtern(int, _lbStepPeriod);
+
+// The floor broadcast when the vote opens, before the count is agreed. No
+// element runs past it, which is what makes the agreed count authoritative
+// rather than a race its broadcast has to win: the furthest any element can be
+// when the count is settled is one call past what it reported, and the agreed
+// count is one past the furthest report.
+CkpvExtern(int, _lbStepTentative);
 
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
@@ -425,6 +449,7 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
+  LBRealType GetTotalObjGPULoad(void) { return lbdb_obj->GetTotalObjGPULoad(); }
   // Copy a round's normalized per-object GPU loads (built by
   // hapiPrepareCuptiLoads) into this PE's LB objects, just before its stats
   // are sent.

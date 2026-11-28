@@ -36,6 +36,7 @@ test: async_arrival
 	$(call run, ./async_arrival 4 0 1 +p4 +balancer DistributedLB)
 	$(call run, ./async_arrival 4 0 1 +p4 +LBSyncResume +balancer DistributedLB)
 	$(call run, ./async_arrival 4 0 1 +p4 +LBAsync +balancer DistributedLB)
+	$(call run, ./async_arrival 4 1 1 1 +p4 +LBAsync +MetaLB +MetaLBGpuTrigger +balancer GreedyRefineCentralGPULB)
 	$(call run, ./async_arrival 3 0 1 +p2)
 	$(call run, ./async_arrival 3 1 1 +p2)
 	$(call run, ./async_arrival 3 1 1 +p2 +LBAsync)

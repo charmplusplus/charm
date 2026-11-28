@@ -30,6 +30,21 @@ private:
   // the destination's database starts the element with its window open.
   bool lbMeasurementClosed;
   void lbSetMeasurementClosed(bool closed);
+  // MetaBalancer's GPU trigger (+MetaLBGpuTrigger). lbStepSeen is the
+  // sequence number of the last step this element joined; AtSyncStart compares
+  // it with CkpvAccess(_lbStepRequested), which is the whole cost of a call
+  // with no step to join. lbIterNo counts this element's AtSyncStart calls:
+  // the application makes them on a fixed cadence, so every element's k-th
+  // call is the same iteration, and the step is agreed as a value of this
+  // counter. lbStepBlocked: AtSyncStart stopped the element at the tentative
+  // floor while the count was being agreed; released by recvLBPeriod.
+  // metaLBStreamJoinedPe: the PE whose sample stream this element has joined,
+  // or -1; an element that arrives on another PE joins that PE's stream at
+  // its next sample. All but the last are pupped.
+  int lbStepSeen;
+  int lbIterNo;
+  bool lbStepBlocked;
+  int metaLBStreamJoinedPe;
 protected:
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
@@ -132,6 +147,12 @@ public:
   // written to the split pattern runs correctly with or without +LBAsync.
   void AtSyncWait();
 
+  // MetaBalancer's sampling hook under +MetaLBGpuTrigger: folds this element's
+  // load into the PE's sample stream, from which PE 0 decides when the device
+  // loads are imbalanced enough to balance. Not part of joining a step; a
+  // no-op without MetaBalancer.
+  void AtSyncSample();
+
   // True when the next AtSyncStart() will actually join a step, so an
   // application can do its pre-migration work -- draining device streams, say
   // -- only on the iterations where that work is needed.
@@ -167,6 +188,7 @@ public:
   enum class AtSyncStatus { Continue, Started, Blocked };
   AtSyncStatus AtSyncStart(int waitForMigration=1) { return AtSyncStatus::Continue; }
   void AtSyncWait() { ResumeFromSync(); }
+  void AtSyncSample() { }
   bool AtSyncPending() const { return false; }
   bool AtSyncStepInFlight() const { return false; }
   void lbCheckWaitRelease() { }
