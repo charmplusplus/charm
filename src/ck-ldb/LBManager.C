@@ -184,6 +184,22 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
       createLoadBalancer(balancer);
     }
   }
+  else
+  {
+    // No balancer named anywhere: the strategy the GPU applications measured
+    // best, when its parts are linked in. MetisLB partitions once (its priced
+    // decision applies the mapping only when the step bound falls), then
+    // DiffusionLB refines at every later step. An application that wants
+    // something else names it with +balancer.
+    const bool haveMetis = lbRegistry.search("MetisLB") != NULL;
+    const bool haveDiffusion = lbRegistry.search("DiffusionLB") != NULL;
+    if (haveMetis) createLoadBalancer("MetisLB");
+    if (haveDiffusion) createLoadBalancer("DiffusionLB");
+    if (CkMyPe() == 0 && (haveMetis || haveDiffusion))
+      CkPrintf("CharmLB> default strategy: %s%s%s (no +balancer given)\n",
+               haveMetis ? "MetisLB once" : "", haveMetis && haveDiffusion ? ", then " : "",
+               haveDiffusion ? "DiffusionLB at every later step" : "");
+  }
 
   // simulation mode
   if (LBSimulation::doSimulation)
@@ -1038,6 +1054,25 @@ void LBManager::ResetAdaptive()
 
 void LBManager::ResumeClients()
 {
+  // One balancing event has ended on this PE. In the default chain (MetisLB
+  // first, DiffusionLB after) the partitioner is asked again every fourth
+  // event: priced, it moves nothing on a balanced run and catches the drift
+  // local moves do not follow. DiffusionLB never calls nextLoadbalancer, so
+  // the switch is made here, on every PE alike.
+  if (loadbalancers.size() == 2 && loadbalancers[0] != NULL && loadbalancers[1] != NULL &&
+      strcmp(loadbalancers[0]->lbName(), "MetisLB") == 0)
+  {
+    lbEventsDone++;
+    const int want = (lbEventsDone % 4 == 0) ? 0 : 1;
+    if (want != currentLBIndex)
+    {
+      loadbalancers[currentLBIndex]->turnOff();
+      currentLBIndex = want;
+      loadbalancers[currentLBIndex]->turnOn();
+      if (CkMyPe() == 0 && want == 0)
+        CmiPrintf("CharmLB> event %d: MetisLB re-evaluates at the next step\n", lbEventsDone);
+    }
+  }
 #if CMK_LBDB_ON
   if (_lb_args.metaLbOn())
   {
