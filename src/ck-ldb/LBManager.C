@@ -578,6 +578,8 @@ void LBManager::init(void)
   CkpvAccess(lbmanagerInited) = true;
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
+  // Move-ledger stall report; costs two loads per second while no step drains.
+  CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)ledgerWatch, this);
 #endif
   objLoadsCollecting = false;
   // Registered through the C-level table, which exists since ConverseInit:
@@ -757,6 +759,108 @@ void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
   if (loadbalancers.size() > 0) loadbalancers[currentLBIndex]->Migrated(waitBarrier);
+}
+
+// ---- Move ledger (see LBManager.h for the contract) --------------------------
+
+void LBManager::ledgerOpen(int step)
+{
+  if (ledgerActive)
+    CkAbort("[%d] LBManager: move ledger for step %d opened while step %d is "
+            "still draining (%zu moves outstanding): overlapping balancer steps\n",
+            CkMyPe(), step, ledgerStep, ledgerEntries.size());
+  ledgerEntries.clear();
+  ledgerRecording = true;
+  ledgerActive = true;
+  ledgerClosed = false;
+  ledgerStep = step;
+  ledgerOpenTime = ledgerLastWarn = CkWallTimer();
+  ledgerDoneFn = nullptr;
+}
+
+int LBManager::ledgerRecord(int locMgr, CmiUInt8 id, int toPe)
+{
+  if (!ledgerRecording) return -1;
+  // A second decision for the same element in one step is still one move:
+  // keep one entry.
+  ledgerEntries[std::make_pair(locMgr, id)] = toPe;
+  return ledgerStep;
+}
+
+void LBManager::ledgerClose(std::function<void()> done)
+{
+  if (!ledgerActive)
+  {
+    // Never opened: nothing to wait for.
+    done();
+    return;
+  }
+  ledgerRecording = false;
+  ledgerClosed = true;
+  ledgerDoneFn = std::move(done);
+  maybeFireLedger();
+}
+
+void LBManager::ledgerRetire(int locMgr, CmiUInt8 id, int step)
+{
+  auto it = ledgerEntries.find(std::make_pair(locMgr, id));
+  if (!ledgerActive || it == ledgerEntries.end() || step != ledgerStep)
+    CkAbort("[%d] LBManager: move-ledger ack for element %llu (location manager %d) "
+            "of step %d matches nothing here (ledger %s, step %d, %zu outstanding): "
+            "a duplicate registration ack or a straggler from another step\n",
+            CkMyPe(), (unsigned long long)id, locMgr, step,
+            ledgerActive ? "active" : "inactive", ledgerStep, ledgerEntries.size());
+  ledgerEntries.erase(it);
+  maybeFireLedger();
+}
+
+void LBManager::ledgerRetireLocal(int locMgr, CmiUInt8 id, const char* why)
+{
+  auto it = ledgerEntries.find(std::make_pair(locMgr, id));
+  if (it == ledgerEntries.end()) return;
+  if (_lb_args.debug())
+    CkPrintf("[%d] LBManager: retiring the move of element %llu here (%s); no "
+             "destination will ack it\n",
+             CkMyPe(), (unsigned long long)id, why);
+  ledgerEntries.erase(it);
+  maybeFireLedger();
+}
+
+void LBManager::maybeFireLedger()
+{
+  if (!ledgerActive || !ledgerClosed || !ledgerEntries.empty()) return;
+  ledgerActive = false;
+  ledgerClosed = false;
+  std::function<void()> fn;
+  fn.swap(ledgerDoneFn);
+  if (fn) fn();
+}
+
+// Once a second: a ledger that stays non-empty is a step that cannot resume,
+// and it can name the moves holding it. Reported every ten seconds.
+void LBManager::ledgerWatch(void* arg)
+{
+  LBManager* mgr = (LBManager*)arg;
+  if (!mgr->ledgerActive || mgr->ledgerEntries.empty()) return;
+  const double now = CkWallTimer();
+  if (now - mgr->ledgerLastWarn < 10.0) return;
+  mgr->ledgerLastWarn = now;
+  CkPrintf("[%d] LBManager: step %d has %zu move(s) outstanding after %.0f s%s:\n",
+           CkMyPe(), mgr->ledgerStep, mgr->ledgerEntries.size(),
+           now - mgr->ledgerOpenTime,
+           mgr->ledgerClosed ? "" : " (decision loop still open)");
+  int shown = 0;
+  for (const auto& kv : mgr->ledgerEntries)
+  {
+    if (++shown > 8)
+    {
+      CkPrintf("[%d]   ... and %zu more\n", CkMyPe(), mgr->ledgerEntries.size() - 8);
+      break;
+    }
+    CkPrintf("[%d]   element %llu (location manager %d) -> PE %d\n", CkMyPe(),
+             (unsigned long long)kv.first.second, kv.first.first, kv.second);
+  }
+  fflush(stdout);
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }

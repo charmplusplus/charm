@@ -141,8 +141,17 @@ void DistBaseLB::LoadBalance() {
 #endif  
 }
 
+// Under +LBSyncResume (which +LBAsync forces) a step ends on the move ledger:
+// each source PE holds its share of the global resume until every move it
+// issued has been acked by the element's registration at its destination
+// (ProcessMigrationDecision), and the global resume therefore waits for every
+// arrival. Without the global resume each PE resumes on its own, so a
+// destination must count its own arrivals in.
+static bool useMoveLedger() { return _lb_args.syncResume(); }
+
 void DistBaseLB::Migrated(int waitBarrier) {
   migrates_completed++;
+  if (useMoveLedger()) return;  // a diagnostic count; the ledger ends the step
   if (migrates_completed == migrates_expected && lb_started) {
     MigrationDone(1);
   }
@@ -156,6 +165,12 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
 #if CMK_LBDB_ON
   strat_end_time = CkWallTimer() - strat_start_time;
   const int me = CkMyPe();
+
+  // Every lbmgr->Migrate below reaches CkLocRec::recvMigrate synchronously,
+  // which records the move in this ledger by element identity, before any
+  // deferral.
+  const bool ledger = useMoveLedger();
+  if (ledger) lbmgr->ledgerOpen(step());
 
   // Migrate messages from me to elsewhere
   for(int i=0; i < migrateMsg->n_moves; i++) {
@@ -178,6 +193,21 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
     if (_lb_args.debug())
       CkPrintf("%s> Strategy took %fs memory usage: %f MB.\n", lbName(),
           strat_end_time - strat_start_time, CmiMemoryUsage()/(1024.0*1024.0));
+  }
+
+  // The message is this function's to free: its caller builds it, hands it
+  // over and forgets it. Freed before MigrationDone, which can run the whole
+  // tail of the step.
+  delete migrateMsg;
+
+  if (ledger) {
+    // Every move is issued. This PE's part of the step is over once each one
+    // has registered at its destination -- deferred ones included. Fires at
+    // once when there is nothing outstanding.
+    lbmgr->ledgerClose([this]() {
+      if (lb_started) MigrationDone(1);
+    });
+    return;
   }
 
   // If all the expected objs have migrated in, then migration is done

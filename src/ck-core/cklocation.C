@@ -2151,6 +2151,11 @@ CkLocRec::~CkLocRec()
   if (deletedMarker != NULL)
     *deletedMarker = true;
 #if CMK_LBDB_ON
+  // A move recorded in a step's ledger that will now never be made: the
+  // element is destroyed without having left (emigrate consumes the tag).
+  // Retired here, or the step never resumes.
+  if (lbLedgerStep >= 0)
+    lbmgr->ledgerRetireLocal(myLocMgr->ckGetGroupID().idx, getID(), "element destroyed");
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
   lbmgr->UnregisterObj(ldHandle);
@@ -2369,6 +2374,12 @@ struct LBDeferredMoveMsg
 void CkLocRec::recvMigrate(int toPe)
 {
   lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
+  // The one point every move a balancer orders passes through, before any
+  // deferral (the readyMigrate buffer, the +LBAsync post, device-channel
+  // work). If a step is recording its moves, enter this one in its ledger and
+  // tag the record so emigrate can tell the destination whom to ack.
+  const int step = lbmgr->ledgerRecord(myLocMgr->ckGetGroupID().idx, getID(), toPe);
+  if (step >= 0) lbLedgerStep = step;
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -4053,6 +4064,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     newEpoch, life, gpuBufSize > 0);
 #if CMK_LBDB_ON
   msg->asyncArrival = rec->isAsyncMigrate();
+  // A move recorded in a step's move ledger: the destination acks this PE once
+  // the element has registered there. The tag is consumed here, so the record's
+  // destructor, which runs below, does not retire the move a second time.
+  msg->lbLedgerSrcPe = (rec->lbLedgerStep >= 0) ? CkMyPe() : -1;
+  msg->lbLedgerStep = rec->lbLedgerStep;
+  rec->lbLedgerStep = -1;
 #endif
 
   {
@@ -4219,6 +4236,14 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
+
+#if CMK_LBDB_ON
+  // The element is registered here: retire its entry in the source's move
+  // ledger. This ack is what releases the source's share of the step's resume.
+  if (msg->lbLedgerSrcPe >= 0)
+    CProxy_LBManager(_lbmgr)[msg->lbLedgerSrcPe].ledgerRetire(thisgroup.idx, msg->id,
+                                                              msg->lbLedgerStep);
+#endif
 
 #if CMK_CUDA
   if (msg->hasGPUMsg)

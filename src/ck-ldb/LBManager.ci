@@ -13,6 +13,9 @@ module LBManager {
     entry void ResumeClients();
     // CkLBSetAsync, on every PE.
     entry void setAsyncMode(bool on);
+    // The destination's ack of the move ledger: the migrated element has
+    // registered, so its entry on the source can be retired.
+    entry void ledgerRetire(int locMgr, CmiUInt8 id, int step);
     entry void collectObjLoads();
     entry void objLoadsCollected(CkReductionMsg* m);
     initnode void initnodeFn();

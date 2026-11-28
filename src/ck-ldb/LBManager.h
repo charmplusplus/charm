@@ -7,6 +7,9 @@
 #define LBMANAGER_H
 
 #include <cassert>
+#include <functional>
+#include <map>
+#include <utility>
 
 #include "LBDatabase.h"
 #include "conv-ccs.h"   // CcsDelayedReply
@@ -300,6 +303,20 @@ class LBManager : public CBase_LBManager
   void init();
   void InvokeLB();
 
+  // Move-ledger state (see the ledger* methods below). Transient within one
+  // balancer step; not pupped. Keyed by (location manager group, element id):
+  // element ids are unique only within one location manager.
+  std::map<std::pair<int, CmiUInt8>, int> ledgerEntries;  // -> destination PE
+  bool ledgerRecording = false;  // inside the decision loop
+  bool ledgerActive = false;     // open, or closed and draining
+  bool ledgerClosed = false;     // every move issued; fire when empty
+  int ledgerStep = -1;
+  double ledgerOpenTime = 0.0;
+  double ledgerLastWarn = 0.0;
+  std::function<void()> ledgerDoneFn;
+  void maybeFireLedger();
+  static void ledgerWatch(void* arg);
+
  public:
   LBDatabase* getLBDB() { return lbdb_obj; }
   inline static LBManager* Object()
@@ -327,6 +344,31 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->RegisterOM(userID, userptr, cb);
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
+
+  // ---- Move ledger -------------------------------------------------------
+  // One entry per move this PE must make in the current balancer step, keyed
+  // by the element's identity, which source and destination both know. Opened
+  // around a strategy's decision loop (DistBaseLB::ProcessMigrationDecision);
+  // recorded from CkLocRec::recvMigrate, the one point every move a balancer
+  // orders passes through however it is deferred later; retired by the
+  // destination once the element has registered there. The PE's share of the
+  // step's resume is held until the ledger drains, so the step waits on every
+  // move by identity -- deferred ones included -- instead of on arrival
+  // counts, and a duplicate or unknown ack is caught where it happens.
+  void ledgerOpen(int step);
+  // The step to tag the element's record with, or -1 when no ledger is
+  // recording (a balancer that does not use one, or a move the application
+  // made itself).
+  int ledgerRecord(int locMgr, CmiUInt8 id, int toPe);
+  // Every move is issued; run `done` once each one has been retired (at once
+  // when the ledger is already empty, or was never opened).
+  void ledgerClose(std::function<void()> done);
+  // Entry method: the destination's ack that the element registered there.
+  void ledgerRetire(int locMgr, CmiUInt8 id, int step);
+  // A recorded move that will never be made (the element was destroyed before
+  // it left). Without this the step would wait for it forever.
+  void ledgerRetireLocal(int locMgr, CmiUInt8 id, const char* why);
+
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
   void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
