@@ -169,6 +169,7 @@ void MetaBalancer::init(void) {
   ignore_periodic = false;
 
   is_prev_lb_refine = -1;
+  switch_acks = 0;
   if (_lb_args.metaLbOn()) {
     periodicCall((void *) this);
   }
@@ -474,6 +475,7 @@ void MetaBalancer::ReceiveMinStats(double *load, int n) {
       Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_utilization,
       min_utilization, load[1]));
 
+  bool switch_sent = false;
    if(!adaptive_lbdb.history_data.empty()){ // probably a better check exists than this
     double mslope, aslope, mc, ac;
     double new_load_percent = max/avg;
@@ -537,7 +539,13 @@ void MetaBalancer::ReceiveMinStats(double *load, int n) {
       DEBAD(("***********Final classification = %d *****************\n", predicted_lb));
 
       // predicted_lb-1 since predicted_lb class count in the model starts at 1
-      thisProxy.MetaLBSetLBOnChares(current_balancer, predicted_lb - 1);
+      // The strategy is switched only in the iteration that balances. Every PE
+      // switches before any PE starts the step: each one reports to PE 0
+      // (MetaLBSwitchDone), which then broadcasts MetaLBCallLBOnChares.
+      if (adaptive_struct.final_lb_period == iteration_n) {
+        thisProxy.MetaLBSetLBOnChares(current_balancer, predicted_lb - 1);
+        switch_sent = true;
+      }
       current_balancer = predicted_lb - 1;
     }
     DEBAD(("mslope %lf aslope %lf\n", mslope, aslope));
@@ -569,7 +577,8 @@ void MetaBalancer::ReceiveMinStats(double *load, int n) {
   }
 
 
-  if (adaptive_struct.final_lb_period == iteration_n) {
+  // After a switch, MetaLBSwitchDone calls LB.
+  if (adaptive_struct.final_lb_period == iteration_n && !switch_sent) {
     thisProxy.MetaLBCallLBOnChares();
   }
 
@@ -922,6 +931,15 @@ void MetaBalancer::MetaLBCallLBOnChares() {
 
 void MetaBalancer::MetaLBSetLBOnChares(int switchFrom, int switchTo) {
   lbmanager->switchLoadbalancer(switchFrom, switchTo);
+  thisProxy[0].MetaLBSwitchDone();
+}
+
+// On PE 0: start the step once every PE has switched.
+void MetaBalancer::MetaLBSwitchDone() {
+  if (++switch_acks == CkNumPes()) {
+    switch_acks = 0;
+    thisProxy.MetaLBCallLBOnChares();
+  }
 }
 
 void MetaBalancer::ReceiveIterationNo(int local_iter_no) {

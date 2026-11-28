@@ -145,6 +145,17 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
     CkPrintf("[%d] Reconfiguring TreeLB\n", CkMyPe());
   }
 
+  // Reconfiguring deletes the level logic and clears the step counters, so it is
+  // an error while this PE is in a step at any level (awaitingLB is empty before
+  // the first configuration).
+  for (bool awaiting : awaitingLB)
+  {
+    if (awaiting)
+      CkAbort("TreeLB: PE %d was reconfigured during load balancing step %d. A "
+              "configuration change must reach every PE before the step starts.\n",
+              CkMyPe(), lbmgr->step());
+  }
+
   mcast_bfactor = builder.getProperty("mcast_bfactor", mcast_bfactor, config);
   step_report_lb_times =
       builder.getProperty("report_lb_times_at_step", step_report_lb_times, config);
