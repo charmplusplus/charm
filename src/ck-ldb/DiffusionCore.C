@@ -1,0 +1,676 @@
+
+/* At the highest level:
+  - for each object compute the gain value (for comm, based on communication OUTWARD
+    - this changes in new impl
+  - while I have neighbors to send to, pick best object
+
+  On completion, waits for QD then calls WITHINNODELB.
+*/
+
+#include <cstdlib>
+#include <cstring>
+#include "DiffusionJSON.h"
+#include "DiffusionSelect.h"
+void DiffusionLB::AcrossNodeLB()
+{
+  if (thisIndex != rank0PE)
+    return;
+
+  if (thisIndex == 0)
+  {
+    if (_lb_args.debug() > 1) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
+  }
+  // WithinNodeLB now starts from the acrossDone barrier below, once every
+  // handoff this phase issued has been acked as processed.
+
+  if (numNodes == 1)
+  {
+    across_owed = true;
+    migMaybeDone();
+    return;  // nothing to do
+  }
+
+  int n_objs = nodeStats->objData.size();
+
+  gain_val = new int[n_objs];
+  memset(gain_val, 100, n_objs);
+
+  // build object comms
+  // DiffusionMetric* metric =
+  //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
+
+  DiffusionMetric* metric;
+  if (_lb_args.diffusionCommOn())
+  {
+    metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad,
+                            sendToNeighbors, myNodeInternalBytes, myNodeExternalBytes,
+                            &diffusionCostCfg);
+  }
+  else
+    metric = new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats,
+                                myNodeId, toSendLoad, sendToNeighbors, nborObjCount);
+
+  loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
+                                [](double load) { return load > 0; });
+
+  // Shed what the PLAN routes out of this node. The pseudo rounds have already
+  // diffused the load numerically, and on a graph deeper than one hop their
+  // plan routes load THROUGH nodes that are themselves below the mean: the
+  // per-neighbour quotas say exactly what each relay must pass on, out of what
+  // it holds (diffusionRoundFlows plans within holdings, so every quota is
+  // executable in one step). The budget used to be this node's own excess over
+  // the neighbourhood mean, zeroed within the floor -- added when the donor was
+  // uncapped and shed everything it held (my_loadAfterTransfer started at the
+  // TOTAL load). That capped the donor, but it also zeroed every relay: on
+  // leanmd's 16x8x8 grid over 8 processes the density ramp runs monotone round
+  // the ring, every interior process sits at its neighbours' mean, and
+  // processes 0-4 made 0 moves in round 1 against planned outflows of 1.4-9 s.
+  // Load crossed one hop per LB step, max/avg went 1.88, 1.56, 1.31, 1.24 over
+  // four steps where the 4-process ring converges in one, and the step time
+  // was 1442 ms against 990 at one node for the same work per process.
+  //
+  // The quotas cap the donor now, a node cannot send more than it holds, and
+  // the plan's own floor (effMinImbalance inside the rounds) is the floor.
+  // What this costs on a stencil, lbsim 32x32 over 8 nodes with a 12x hot
+  // disc: the plan budget reaches 1.03 in two steps where the excess budget is
+  // at 1.41 and ends at 1.15 after four, for 1.4x the moves, a worse cut (250
+  // against 163) and more detached pieces (10 against 2). A scratch-remap
+  // beats both there (1.02, cut -16%, 0 pieces; +LBDiffusionRemapAbove), so
+  // that stays the tool for deep plans on a stencil; leanmd's remap is a
+  // MetisLB its cut gate refuses.
+  {
+    const double fair = avgNborLoad();
+    const double excess = my_load - fair;
+    double planOut = 0.0, planIn = 0.0;
+    for (double q : toSendLoad)
+    {
+      if (q > 0.0) planOut += q;
+      else planIn -= q;
+    }
+    my_loadAfterTransfer = (planOut < my_load) ? planOut : my_load;
+    if (_lb_args.debug() > 1)
+      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f) "
+               "plan out=%f in=%f excess=%f\n",
+               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance, planOut,
+               planIn, excess);
+
+    // The receiver check in the dimension NOT being diffused (DiffusionMetric.h).
+    // Both terms are read as seconds of step time. The step the plan brings
+    // every node to is the larger of the two dimensions' neighbourhood means:
+    // the diffused one's when it binds, which is the measured choice; the
+    // other one's when a flag forced the diffused dimension against the
+    // measurement -- taking only the diffused mean there would put the target
+    // below every node's actual step and refuse every move. A neighbour may
+    // take load in the slack dimension up to that level and no further;
+    // beyond it that dimension, not the diffused one, decides its step. Host
+    // time is a per-PE term (a node's total over its PEs) and device time a
+    // per-node term, so the capacity handed to the metric is converted back
+    // to the raw units the object loads come in.
+    //
+    // Under LB_MODE_STEP the diffused quantity IS step time, so the fair level
+    // is the target as it stands, and both dimensions are bounded by it; the
+    // metric then also knows what a candidate costs the receiver's step.
+    if (neighborCount > 0 && (int)nborHostPerPe.size() >= neighborCount &&
+        (int)nborDev.size() >= neighborCount)
+    {
+      const int mode = diffusionLoadMode();
+      const double inf = std::numeric_limits<double>::max();
+      std::vector<double> capH(neighborCount, inf), capG(neighborCount, inf);
+      double limit = 0.0, fairStep = 0.0, fairOther = 0.0;
+      if (mode == LB_MODE_STEP)
+      {
+        fairStep = fair;
+        limit = fairStep * (1.0 + effMinImbalance);
+        for (int i = 0; i < neighborCount; i++)
+        {
+          capH[i] = std::max(0.0, limit - nborHostPerPe[i]) * nodeSize;
+          capG[i] = std::max(0.0, limit - nborDev[i]);
+        }
+        metric->setRiseKnown(true);
+      }
+      else
+      {
+        const bool devDim = (mode == LB_MODE_DEVICE);
+        for (int i = 0; i < neighborCount; i++)
+          fairOther += devDim ? nborHostPerPe[i] : nborDev[i];
+        fairOther /= neighborCount;
+        fairStep = std::max(devDim ? fair : fair / nodeSize, fairOther);
+        limit = fairStep * (1.0 + effMinImbalance);
+        for (int i = 0; i < neighborCount; i++)
+        {
+          if (devDim) capH[i] = std::max(0.0, limit - nborHostPerPe[i]) * nodeSize;
+          else capG[i] = std::max(0.0, limit - nborDev[i]);
+        }
+      }
+      metric->setReceiverCapacity(capH, capG);
+      if (_lb_args.debug() > 1)
+        CkPrintf("[node %d] AcrossNodeLB: %s; step target %.6f (fair %.6f, other-dimension "
+                 "mean %.6f); receiver room per neighbour (host,device):%s\n",
+                 myNodeId, lbLoadModeName(mode), limit, fairStep, fairOther, [&]() {
+                   std::string s;
+                   for (int i = 0; i < neighborCount; i++)
+                   {
+                     char b[64];
+                     snprintf(b, sizeof(b), " (%.4g,%.4g)", capH[i], capG[i]);
+                     s += b;
+                   }
+                   return s;
+                 }().c_str());
+    }
+  }
+
+#if CMK_GPU
+  // The memory contract, planned here and held at the receiver. Every
+  // across-node move stages, so each neighbour may take objects up to the
+  // room it advertised with its loads, and this node's step may pack payloads
+  // up to its own room and IPC slots (the local I-batch: this balancer issues
+  // a step's moves together). Two donors can plan against one neighbour's
+  // room; the admission gate at the receiver is what holds.
+  if (neighborCount > 0 && (int)nborMem.size() >= neighborCount &&
+      (int)objFootprint.size() == n_objs)
+    metric->setMemoryCapacity(nborMem, myStagingCap, mySlots, objFootprint, objStaged,
+                              nodeStats->objData);
+#endif
+
+  // Per-step cap on what may leave this node, as a share of its migratable
+  // objects. The bound that makes a step safe is the one above -- a node sheds
+  // its EXCESS over the neighbourhood mean and nothing more -- and this cap
+  // only limits how fast it gets there. It is a count, applied to objects that
+  // carry very unequal load, so it can stop a shed part-way: measured on the
+  // moe example, whose expert loads are Zipf-skewed, a node asked to shed
+  // 0.187 stopped after four objects with 0.102 still unshed and the job sat
+  // at 1.9x imbalance for five steps instead of recovering in one.
+  //
+  // Lifting it entirely is not the answer either: at 1.0 the same runs did
+  // recover in one step and held 1.2-1.33x, but moved 35-54 objects where the
+  // capped runs moved 6-9, and the step time did not improve (190-212 ms
+  // against 179-202). At this object size the migration traffic pays for the
+  // balance it buys. The cap stays at its default; a balancer that could cap
+  // in the load dimension rather than by object count would get the recovery
+  // without the traffic, and that is the open item.
+  // The cap is now in the diffused dimension, not a count of objects: a share
+  // of the load this node could migrate, rather than a share of the objects it
+  // holds. This is the open item the paragraph above describes. A count cap
+  // stops a shed at a point unrelated to the load it has retired, so a node
+  // whose load sits in a few heavy objects gives up with most of its excess
+  // still on it -- moe's Zipf-skewed experts stopping after four objects with
+  // 0.102 of 0.187 unshed, and the lbdriver stencil spending all 64 of its
+  // moves on hot cells while a quarter of the job's load stayed put.
+  //
+  // Expressed against migratable load so the two ends behave: a node holding
+  // many near-empty objects still cannot hand them all over (they retire no
+  // budget, so the cap is never what stops them -- the metric's zero-load
+  // refusal is), and a node holding a few heavy ones can shed enough of them
+  // to matter in one step.
+  double maxShed = std::numeric_limits<double>::max();
+  {
+    const double frac = _lb_args.diffusionMaxMoveFrac();
+    if (frac < 1.0)
+    {
+      double migLoad = 0.0;
+      for (int i = 0; i < n_objs; i++)
+        if (nodeStats->objData[i].migratable)
+          migLoad += diffusionObjLoad(nodeStats->objData[i]);
+      maxShed = frac * migLoad;
+    }
+  }
+  double shedThisStep = 0.0;
+  int movesThisStep = 0;
+
+  // TEMPORARY diagnostic: why does across-node diffusion move nothing?
+  if (_lb_args.debug() > 1)
+  {
+    CkPrintf("[node %d] AcrossNodeLB: my_load=%f nbrs=%d loadReceivers=%d n_objs=%d\n",
+             myNodeId, my_load, neighborCount, loadReceivers, n_objs);
+    for (int i = 0; i < neighborCount; i++)
+      CkPrintf("[node %d]   toSendLoad[%d] (-> node %d) = %f\n",
+               myNodeId, i, sendToNeighbors[i], toSendLoad[i]);
+  }
+
+  // iterate through objects and set from_pe and to_pe correctly
+  for (int i = 0; i < n_objs; i++)
+  {
+    int from = nodeStats->from_proc[i];
+    CkAssert(from < numPes && from >= 0);
+    // todo also assert from is on this node?
+    nodeStats->to_proc[i] = -1;  // negative one if not migrated
+  }
+
+  // The selection loop is diffusionSelectMoves (DiffusionSelect.h), shared with
+  // the offline simulator so the two cannot drift apart. It hands back the
+  // accepted moves in order; everything below is the messaging for each one.
+  std::vector<DiffusionMove> moves;
+  {
+    std::function<void(int, std::vector<char>&)> allowedEnds;
+    // With a 1-D ordering key only the interval's ends may go, and only
+    // toward the side this neighbour is on. Both metrics honour the filter.
+    if (keyed1D)
+      allowedEnds = [this](int nbor, std::vector<char>& a) { allowedEndsFor(nbor, a); };
+    diffusionSelectMoves(*metric, *nodeStats, toSendLoad, my_loadAfterTransfer, maxShed,
+                         allowedEnds, myNodeId, moves, shedThisStep, movesThisStep);
+  }
+
+  for (const DiffusionMove& mv : moves)
+  {
+    const int v_id = mv.obj;
+    const int nborId = mv.nbor;
+
+    // Two different figures, because two different consumers.
+    //
+    // shedLoad is in the diffused quantity: it retired this node's obligation
+    // (my_loadAfterTransfer) and the per-neighbour quota in the selection loop,
+    // both of which the pseudo-LB rounds expressed in that quantity. It stays
+    // here; what travels are the object's two measured loads.
+    //
+    // cpuLoad is host time: the receiver adds it to pe_load and hands it to the
+    // within-node heap, which balances host work between PEs that share a
+    // device. Shipping GPU time would corrupt that. gpuLoad is the object's
+    // measured device time, which the receiver's within-node phase reads when
+    // its own device is what binds.
+    //
+    // Both read the measured loads (getCompLoad()/objData).
+    const double shedLoad = mv.shedLoad;
+    (void)shedLoad;
+    const double cpuLoad = objs[v_id].getCompLoad();
+    const double gpuLoad = diffusionObjGpuLoad(nodeStats->objData[v_id]);
+    objs[v_id].setCurrPe(-1);
+
+    int rank = GetRank(v_id);
+    int node = sendToNeighbors[nborId];
+    int donorPE = rank0PE + rank;
+    int destPE = node * nodeSize;  // send to rank0PE of dest node
+    CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
+
+    if (nodeStats->from_proc[v_id] != donorPE) {
+      CkAbort(
+          "ERROR: Across Node LB - from_proc[%d] = %d does not match donorPE = %d\n",
+          v_id, nodeStats->from_proc[v_id], donorPE);
+    }
+
+    num_migrations++;
+
+    LDObjHandle objHandle = nodeStats->objData[v_id].handle;
+
+    int pe_local_id = v_id;
+    if (donorPE != rank0PE) {
+      pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
+    }
+
+    mig_acksOut += 2;
+    thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, gpuLoad, donorPE, 0,
+                                   CkMyPe(), keyOf(nodeStats->objData[v_id]));
+    thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
+    nodeStats->to_proc[v_id] = destPE;
+  }
+
+  // Says which of the two reasons a quiet step had: nothing available to move,
+  // or everything available priced out. Without this the two are
+  // indistinguishable from the outside, and they call for opposite responses.
+  if (_lb_args.debug() > 1 && metric != NULL)
+    CkPrintf("[node %d] AcrossNodeLB: %d move(s) accepted, %d neighbour(s) with "
+             "no move worth making, %d candidate(s) refused by the receiver check%s "
+             "(%d failed memory checks), %.6f load left unshed\n",
+             myNodeId, metric->acceptedCount(), metric->rejectedCount(),
+             metric->slackRefusals,
+             diffusionStepMode() ? ""
+             : diffusionDeviceDim() ? " (host dimension)" : " (device dimension)",
+             metric->memRefusals, my_loadAfterTransfer > 0 ? my_loadAfterTransfer : 0.0);
+
+  // Owned by this function since it was created here; the per-object vectors
+  // inside it are sized by the node's object count, so leaking one per node per
+  // balancer step is not free.
+  delete metric;
+  metric = NULL;
+
+  across_owed = true;
+  migMaybeDone();
+}
+
+// The phase-completion machinery shared by the across- and within-node
+// handoffs. A rank0PE holds its barrier contribution until every
+// LoadMetaInfo/LoadReceived it sent has been acked by its receiver's handler,
+// so the barrier on PE 0 completes only when every migration record this
+// phase created is in place everywhere. The phases are sequential, so one
+// counter serves both.
+void DiffusionLB::migMsgAck()
+{
+  // Every ack pairs with a += 2 at a handoff this step. One stray or
+  // duplicated ack silently collapses the phase barrier: acrossDone or
+  // withinDone then fires before every LoadReceived has landed, so
+  // ProcessMigrations both loses migrations (the step never completes) and
+  // reopens the dangling-map window it resets. Make that protocol violation
+  // loud instead of letting it surface as heap corruption far away.
+  if (mig_acksOut <= 0)
+    CkAbort("DiffusionLB: migMsgAck on PE %d with no ack outstanding "
+            "(mig_acksOut=%d)\n", CkMyPe(), mig_acksOut);
+  mig_acksOut--;
+  migMaybeDone();
+}
+
+void DiffusionLB::migMaybeDone()
+{
+  if (mig_acksOut > 0) return;
+  if (across_owed)
+  {
+    across_owed = false;
+    // Neighbour-local, not a rendezvous on PE 0. This node's across-node
+    // handoffs are all acked, so it will send nothing further this phase --
+    // tell the only nodes that could have been waiting on it. Diffusion moves
+    // load between neighbours and nowhere else, so a node that has heard this
+    // from every neighbour knows nothing more can arrive, which is the whole
+    // property the job-wide barrier was buying.
+    acrossSelfDone = true;
+    for (size_t i = 0; i < sendToNeighbors.size(); i++)
+      thisProxy[sendToNeighbors[i] * nodeSize].nbrAcrossDone();
+    maybeStartWithin();
+  }
+  if (within_owed)
+  {
+    within_owed = false;
+    // The debug and dump paths keep every node in lockstep -- group-wide
+    // reductions in CollectStats, a PE 0 gather in ProcessFinalStats -- so
+    // they still go through the PE 0 barrier. Otherwise the moves start
+    // neighbour-locally, see maybeStartMigrations.
+    if (step() == LBSimulation::dumpStep || _lb_args.debug() > 0)
+      thisProxy[0].withinDone();
+    else
+    {
+      withinSelfDone = true;
+      for (size_t i = 0; i < sendToNeighbors.size(); i++)
+        thisProxy[sendToNeighbors[i] * nodeSize].nbrWithinDone();
+      maybeStartMigrations();
+    }
+  }
+}
+
+// A neighbour has finished its within-node phase, so it will retarget nothing
+// further of ours this step.
+void DiffusionLB::nbrWithinDone()
+{
+  withinNbrDoneCount++;
+  maybeStartMigrations();
+}
+
+// Start this node's moves once its own within-node phase is acked AND every
+// neighbour's is. The second half is what makes the move list final: a
+// neighbour that received one of our tokens may hand it on to another of its
+// PEs, and that retarget is a LoadReceived to OUR donor PE. It is acked to the
+// neighbour before the neighbour reports its phase done, so once every
+// neighbour has reported, every retarget of ours has been applied. Nodes that
+// are not neighbours hold none of our tokens and are not waited for; with one
+// node there are no neighbours and the moves start at once.
+void DiffusionLB::maybeStartMigrations()
+{
+  if (!withinSelfDone) return;
+  if (withinNbrDoneCount < (int)sendToNeighbors.size()) return;
+  withinSelfDone = false;
+  withinNbrDoneCount = 0;
+  const int first = myNodeId * nodeSize;
+  for (int r = 0; r < nodeSize; r++) thisProxy[first + r].ProcessMigrations();
+}
+
+// A neighbour has finished its across-node handoffs.
+void DiffusionLB::nbrAcrossDone()
+{
+  acrossNbrDoneCount++;
+  maybeStartWithin();
+}
+
+// Start within-node once this node is done sending and every neighbour has
+// said the same. Both halves are needed and either can arrive first, so this
+// is checked from both. Within-node is purely intra-node work, so it starts on
+// this node's PEs alone -- no other node is involved and none is waited for.
+void DiffusionLB::maybeStartWithin()
+{
+  if (!acrossSelfDone) return;
+  if (acrossNbrDoneCount < (int)sendToNeighbors.size()) return;
+  acrossSelfDone = false;
+  acrossNbrDoneCount = 0;
+  const int first = myNodeId * nodeSize;
+  for (int r = 0; r < nodeSize; r++) thisProxy[first + r].WithinNodeLB();
+}
+
+// Retained for the job-wide path; no longer on the critical path.
+void DiffusionLB::acrossDone()
+{
+  if (++acrossDoneCount < numNodes) return;
+  acrossDoneCount = 0;
+  thisProxy.WithinNodeLB();
+}
+
+// When load balancing, remove object handle from your list, since it is about to be
+// migrated
+/* LoadMetaInfo is called on the receiver with the object that will be migrated to it
+ * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
+ * level. Not sure why the receiver would already have this handle though...*/
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, double gload, int senderPE,
+                               int only_mcount, int ackPE, double key)
+{
+  // The rank0PE that issued this handoff and is holding its phase barrier
+  // open. Carried explicitly: a within-node token's donorPE is on another
+  // node, so the issuer cannot be inferred from the other fields.
+  thisProxy[ackPE].migMsgAck();
+
+
+  // local_id should be PE local here
+  // One more arrival to expect. Under +LBSyncResume the step ends on these
+  // counts (DistBaseLB::Migrated).
+  migrates_expected++;
+  if(only_mcount)
+    return;
+  if (thisIndex != rank0PE) {
+    CkAbort("Error: LoadMetaInfo called during across node on non-rank0PE %d\n", thisIndex);
+  }
+  pe_load[0] += load;
+  int idx = FindObjectHandle(h);  // if object is in my handles
+  if (idx == -1)
+  {
+    objectHandles.push_back(h);
+    objectSrcIds.push_back(local_id);
+    objectLoads.push_back(load);
+    objectGLoads.push_back(gload);
+    objectKeys.push_back(key);
+    objSenderPEs.push_back(senderPE);
+  }
+  else
+  {
+    CkAbort("Error: LoadMetaInfo called for object handle %d that already exists on PE %d\n",
+            h.handle, thisIndex);
+#if 0
+    CascadingMigration(h, load);
+    objectHandles[idx] = objectHandles[objectHandles.size() - 1];
+    objectLoads[idx] = objectLoads[objectLoads.size() - 1];
+    objectSrcIds[idx] = objectSrcIds[objectSrcIds.size()-1];
+    objSenderPEs[idx] = objSenderPEs[objSenderPEs.size()-1];
+    objectHandles.pop_back();
+    objectLoads.pop_back();
+    objectSrcIds.pop_back();
+    objSenderPEs.pop_back();
+#endif
+  }
+}
+
+
+
+void DiffusionLB::ProcessFinalStats() {
+  if (thisIndex == rank0PE)
+  {
+    int n_objs = nodeStats->objData.size();
+    std::vector<bool> isMigratable(n_objs);
+    for (int i = 0; i < n_objs; i++)
+    {
+      isMigratable[i] = nodeStats->objData[i].migratable;
+    }
+
+    std::vector<std::vector<LBRealType>> positions(n_objs);
+    std::vector<double> load(n_objs);
+    for (int i = 0; i < n_objs; i++)
+    {
+      // Simulator/dump path (LBSimulation::dumpStep only). Uses the same combined
+      // figure as the balancer itself, so a dumped trace reflects the load the
+      // decisions were actually made on -- note the receiving side stores it back
+      // into wallTime, which is lossy on a CUDA run.
+      load[i] = diffusionObjLoad(nodeStats->objData[i]);
+
+      int size = nodeStats->objData[i].position.size();
+      positions[i].resize(size);
+      for (int j = 0; j < size; j++)
+      {
+        positions[i][j] = nodeStats->objData[i].position[j];
+      }
+    }
+  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
+                                    nodeStats->n_migrateobjs, positions, load,
+                                    nodeStats->commData);
+
+    // Clear nodeStats after sending to avoid accumulation in next round
+    nodeStats->objData.clear();
+    nodeStats->from_proc.clear();
+    nodeStats->to_proc.clear();
+    nodeStats->commData.clear();
+    nodeStats->n_migrateobjs = 0;
+    }
+
+  // ProcessMigrations starts once PE 0 has every node's stats; see
+  // ReceiveFinalStats.
+}
+
+void DiffusionLB::CollectStats() {
+
+  double load_to_report = 0.0;
+  double external_to_report = 0.0;
+  double internal_to_report = 0.0;
+  double avg_load = 0.0;
+  double max_load = 0.0;
+
+  int num_migrations = total_migrates;
+
+  if (thisIndex == rank0PE) {
+    for (int i = 0; i < nodeSize; i++) load_to_report += pe_load[i];
+    avg_load = load_to_report;
+    max_load = std::max_element(pe_load.begin(), pe_load.end())[0];
+    external_to_report = myNodeExternalBytes;
+    internal_to_report = myNodeInternalBytes;
+  }
+
+  
+  CkCallback cb_max_load(CkReductionTarget(DiffusionLB, print_max_load), thisProxy[0]);
+  contribute(sizeof(double), &max_load, CkReduction::max_double, cb_max_load);
+
+  CkCallback cb_avg_load(CkReductionTarget(DiffusionLB, print_avg_load), thisProxy[0]);
+  contribute(sizeof(double), &avg_load, CkReduction::sum_double, cb_avg_load);
+
+  CkCallback cb_external_comm(CkReductionTarget(DiffusionLB, print_external_comm), thisProxy[0]);
+  contribute(sizeof(double), &external_to_report, CkReduction::sum_double, cb_external_comm);
+
+  CkCallback cb_internal_comm(CkReductionTarget(DiffusionLB, print_internal_comm), thisProxy[0]);
+  contribute(sizeof(double), &internal_to_report, CkReduction::sum_double, cb_internal_comm);
+
+  CkCallback cb_num_migrations(CkReductionTarget(DiffusionLB, print_num_migrations), thisProxy[0]);
+  contribute(sizeof(int), &total_crossnode_migrates, CkReduction::sum_int, cb_num_migrations);
+
+  // Group reductions complete in contribution order, so the
+  // print_num_migrations target -- the last contribute above -- is the end of
+  // this phase, and it starts ProcessMigrations from there. No quiescence.
+}
+
+void DiffusionLB::print_max_load(double max){
+  CkPrintf("Max load per PE AFTER LB: %f\n", max);
+}
+void DiffusionLB::print_avg_load(double sum){
+    CkPrintf("Avg load per PE AFTER LB: %f\n", sum / numPes);
+
+}
+void DiffusionLB::print_num_migrations(int sum){
+    CkPrintf("Number of cross node migrations AFTER LB: %d\n", sum);
+    // Last of the CollectStats reductions: the stats phase is over.
+    thisProxy.ProcessMigrations();
+}
+void DiffusionLB::print_external_comm(double sum){
+    CkPrintf("External comm BEFORE LB: %f MB\n", sum / (1024 * 1024 * 2));
+
+}
+void DiffusionLB::print_internal_comm(double sum){
+      CkPrintf("Internal comm BEFORE LB: %f MB\n", sum / (1024 * 1024 * 2));
+}
+
+
+double DiffusionLB::averagePE()
+{
+  double avg = 0.0;
+  for (int i = 0; i < nodeSize; i++) avg += pe_load[i];
+  avg /= nodeSize;
+  return avg;
+}
+
+
+int DiffusionLB::FindObjectHandle(LDObjHandle h)
+{
+  for (int i = 0; i < objectHandles.size(); i++)
+    if (objectHandles[i].id == h.id)
+      return i;
+  return -1;
+}
+
+
+// all nodes call this to send final stats to 0. For printing to JSON
+// TODO: this is broken rn, because of BaseLB::LDStats pup problems
+void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
+                                    std::vector<int> from_proc, std::vector<int> to_proc,
+                                    int n_migrateobjs,
+                                    std::vector<std::vector<LBRealType>> positions,
+                                    std::vector<double> load,
+                                    std::vector<LDCommData> commData)
+{
+  CkAssert(thisIndex == 0);
+
+  // store the message
+  statsReceived++;
+  if (statsReceived == numNodes)
+  {
+    statsReceived = 0;
+    thisProxy.ProcessMigrations();
+  }
+
+  // Clear fullStats at the start of each new round
+  if (statsReceived == 1) {
+    fullStats->objData.clear();
+    fullStats->from_proc.clear();
+    fullStats->to_proc.clear();
+    fullStats->commData.clear();
+    fullStats->n_migrateobjs = 0;
+  }
+
+  int oldSize = fullStats->objData.size();
+
+  fullStats->objData.resize(fullStats->objData.size() + isMigratable.size());
+
+  fullStats->n_migrateobjs += n_migrateobjs;
+
+  for (int i = 0; i < isMigratable.size(); i++)
+  {
+    fullStats->objData[i + oldSize].migratable = isMigratable[i];
+    fullStats->objData[i + oldSize].wallTime = load[i];
+
+    int poslen = positions[i].size();
+    for (int j = 0; j < poslen; j++)
+    {
+      fullStats->objData[i + oldSize].position.push_back(positions[i][j]);
+    }
+  }
+
+  fullStats->from_proc.insert(fullStats->from_proc.end(), from_proc.begin(),
+                              from_proc.end());
+  fullStats->to_proc.insert(fullStats->to_proc.end(), to_proc.begin(), to_proc.end());
+
+  fullStats->commData.insert(fullStats->commData.end(), commData.begin(),
+                              commData.end());
+
+  if (statsReceived == numNodes)
+  {
+    statsReceived = 0;
+    printf("Writing final stats with number of objects: %d\n", fullStats->objData.size());
+    writeStatsMsgsJSON(fullStats);
+  }
+}
+

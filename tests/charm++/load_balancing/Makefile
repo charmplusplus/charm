@@ -6,6 +6,7 @@ DIRS = \
   migrate_then_atsync \
   lbsweep \
   memcontract \
+  lbdriver \
 
 TESTDIRS = $(DIRS)
 

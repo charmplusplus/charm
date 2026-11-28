@@ -112,6 +112,25 @@ add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
 add_dependencies(moduleRecBipartLB ck)
+# DiffusionLB is a single translation unit: DiffusionLB.C #includes DiffusionHelper.C,
+# DiffusionMetric.C, DiffusionNeighbors.C, DiffusionPseudo.C and DiffusionCore.C, so
+# only DiffusionLB.C is compiled. The rest are listed for dependency tracking.
+add_library(moduleDiffusionLB ../ck-ldb/DiffusionLB.C ../ck-ldb/DiffusionLB.h
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C ../ck-ldb/DiffusionJSON.h
+  ../ck-ldb/DiffusionLoad.h ../ck-ldb/DiffusionMetric.h ../ck-ldb/DiffusionFlow.h
+  ../ck-ldb/DiffusionSelect.h ../ck-ldb/DiffusionCostModel.h)
+set_source_files_properties(
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C
+  PROPERTIES HEADER_FILE_ONLY TRUE)
+# DiffusionLB can hand a step to a scratch-remap (+LBDiffusionRemapAbove), which
+# it runs on a MetisLB it creates itself; so it links the CommonLBs module (which
+# carries MetisLB together with the ckgraph classes it needs) and METIS. Link
+# -module DiffusionLB alone, not together with -module EveryLB, which carries a
+# second copy of the same objects.
+add_dependencies(moduleDiffusionLB ck moduleCommonLBs)
+configure_file(../ck-ldb/libmoduleDiffusionLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_library(moduleGreedyRefineCentralGPULB ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
 add_dependencies(moduleGreedyRefineCentralGPULB ck)
 add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)

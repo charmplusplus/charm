@@ -1,0 +1,27 @@
+mainmodule lbdriver
+{
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Cell cells;
+  readonly int nx;
+  readonly int ny;
+  readonly int itersPerPhase;
+  readonly int ghostBytes;
+
+  mainchare Main
+  {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void iterDone();
+    entry [reductiontarget] void lbDone();
+    entry [reductiontarget] void mapReport(int n, int peOf[n]);
+  };
+
+  array [2D] Cell
+  {
+    entry Cell();
+    entry void recvGhost(int len, char d[len]);
+    entry void iterate();
+    entry void setWeight(double w);
+    entry void startLB();
+    entry void reportMap();
+  };
+};

@@ -20,8 +20,13 @@ class InfoRecord
 public:
    double load;
 //   LDOMid omID;
-//   LDObjid id; 
+//   LDObjid id;
    int Id; // should replace other Ids.
+   // Added for DiffusionLB's within-node heap, which tracks an object's current PE,
+   // whether it is a load token rather than a real object, and its handle.
+   int pe;
+   bool token;
+   LDObjHandle handle;
 };
 
 
