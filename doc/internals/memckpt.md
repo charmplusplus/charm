@@ -296,7 +296,9 @@ message is handled, which can fall between two PEs' writes. `CkCheckpointWriteMg
 therefore starts the writes (`Write`) only once no migration is in
 progress. Each PE counts migrations started (`migrateMe`,
 `CkLocMgr::emigrate`) and finished (`ArrayElement::ckEmigrateCounted`,
-`CkLocMgr::immigrate`). `TCharm::migrateTo` (`AMPI_Migrate_to_pe`,
+`CkLocMgr::immigrate`, or `processAfterActiveRgetsCompleted` once the
+element's zero-copy buffers are filled).
+`TCharm::migrateTo` (`AMPI_Migrate_to_pe`,
 `TCHARM_Migrate_to`) calls `migrateMe`. A program that sends
 `ckEmigrate` itself counts no start, so `ckEmigrate` counts no finish: a
 checkpoint does not wait for that message, and the totals stay

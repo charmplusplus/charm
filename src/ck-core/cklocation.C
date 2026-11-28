@@ -3091,6 +3091,8 @@ CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
 // Used to handle messages that were buffered because of active rgets in progress
 void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
 {
+  // The migration finishes now that the element's zero-copy buffers are filled
+  CkMigrationFinished();
   // Call ckJustMigrated
   CkLocRec* myLocRec = elementNrec(id);
   callMethod(myLocRec, &CkMigratable::ckJustMigrated);
@@ -3960,7 +3962,6 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 #endif
 
-  CkMigrationFinished();
   insertID(idx, msg->id);
 
   // Create a record for this element
@@ -4002,6 +4003,7 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 
   if (!zcRgetsActive)
   {
+    CkMigrationFinished();
     // Let all the elements know we've arrived
     callMethod(rec, &CkMigratable::ckJustMigrated);
   }
