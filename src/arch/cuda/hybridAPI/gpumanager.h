@@ -184,6 +184,25 @@ struct GPUManager {
   int hapi_ipc_event_pool_size_pe;
   int hapi_ipc_event_pool_size_total;
 
+  // The device pool (hapiDevPool* in hapi_impl.cpp). CkDeviceMalloc takes from
+  // it whatever these say; +gpupool (device_pool_on) also makes it the
+  // runtime's allocation policy: hapiMalloc, migration payloads and receive
+  // arenas come from it, and the migration admission check and window are on.
+  //   device_pool_arena_bytes   +gpupoolsize: an arena (buddy) or the startup
+  //                             mapping unit (vmm); 0 for CK_GPU_ARENA_MB / 256 MB
+  //   device_pool_arenas        +gpupoolarenas: arenas opened per device at
+  //                             startup (0: one)
+  //   device_pool_backend       +gpupoolalloc: 0 buddy, 1 vmm
+  //   device_pool_chunk_bytes   +gpupoolchunk: vmm chunk (0: 256 MB)
+  //   device_pool_reserve_bytes +gpupoolreserve: vmm range per device (0:
+  //                             twice the device's memory)
+  bool device_pool_on;
+  size_t device_pool_arena_bytes;
+  int device_pool_arenas;
+  int device_pool_backend;
+  size_t device_pool_chunk_bytes;
+  size_t device_pool_reserve_bytes;
+
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
@@ -314,6 +333,14 @@ struct GPUManager {
     // Number of CUDA IPC events per PE
     hapi_ipc_event_pool_size_pe = -1;
     hapi_ipc_event_pool_size_total = -1;
+
+    // Device pool: on demand only, buddy arenas of the default size
+    device_pool_on = false;
+    device_pool_arena_bytes = 0;
+    device_pool_arenas = 0;
+    device_pool_backend = 0;
+    device_pool_chunk_bytes = 0;
+    device_pool_reserve_bytes = 0;
 
 #if CMK_CUDA && CMK_LBDB_ON
     // CUPTI load balancing

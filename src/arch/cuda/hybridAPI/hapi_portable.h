@@ -23,6 +23,8 @@ extern "C++" {
 #undef CMK_HIP
 
 #include "conv-mach-opt.h"
+#include <stdint.h>
+#include <stddef.h>
 
 #ifdef CMK_CUDA
 
@@ -108,8 +110,11 @@ extern "C++" {
 #define hapiGetDeviceProperties(prop, dev) cudaGetDeviceProperties(prop, dev)
 #define hapiGetDevice(dev) cudaGetDevice(dev)
 
-#define hapiMalloc(ptr, size) cudaMalloc(ptr, size)
-#define hapiFree(ptr) cudaFree(ptr)
+/* The vendor's allocator itself. hapiMalloc / hapiFree, defined at the end of
+ * this header, take memory from the device pool under +gpupool and charge it
+ * to the running chare. */
+#define hapiMallocRaw(ptr, size) cudaMalloc((void**)(ptr), size)
+#define hapiFreeRaw(ptr) cudaFree(ptr)
 /* hapiMallocHost/hapiFreeHost are real functions, not macros, in C++.  The
  * pooled forms in hapi.h -- hapiMallocHost(ptr, size, pool) and
  * hapiFreeHost(ptr, pool) -- are overloads of these names, and a function-like
@@ -164,6 +169,55 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiStreamGetDevice(stream, dev) cudaStreamGetDevice(stream, dev)
 #else
 #define HAPI_HAS_STREAM_GET_DEVICE 0
+#endif
+
+/* The device pool's virtual-memory backend (+gpupoolalloc vmm, hapi_impl.cpp):
+ * a reserved address range backed in place by physical chunks. Driver-level
+ * calls, so they take integer device addresses on both vendors. */
+#define hapiDrvDevice CUdevice
+#define hapiMemGenericAllocationHandle CUmemGenericAllocationHandle
+#define hapiMemAllocationProp CUmemAllocationProp
+#define hapiMemAccessDesc CUmemAccessDesc
+#define hapiMemAllocationGranularityFlags CUmemAllocationGranularity_flags
+#define hapiMemHandleTypeNone CU_MEM_HANDLE_TYPE_NONE
+#define hapiMemLocationTypeDevice CU_MEM_LOCATION_TYPE_DEVICE
+#define hapiMemAllocationTypePinned CU_MEM_ALLOCATION_TYPE_PINNED
+#define hapiMemAccessFlagsProtReadWrite CU_MEM_ACCESS_FLAGS_PROT_READWRITE
+#define hapiMemAllocGranularityMinimum CU_MEM_ALLOC_GRANULARITY_MINIMUM
+#define hapiMemAllocGranularityRecommended CU_MEM_ALLOC_GRANULARITY_RECOMMENDED
+#ifdef __cplusplus
+static inline hapiDrvResult hapiDrvGetErrorName(hapiDrvResult r, const char** s) { return cuGetErrorName(r, s); }
+static inline hapiDrvResult hapiDrvDeviceGet(hapiDrvDevice* d, int ordinal) { return cuDeviceGet(d, ordinal); }
+static inline hapiDrvResult hapiDrvDeviceTotalMem(size_t* bytes, hapiDrvDevice d) { return cuDeviceTotalMem(bytes, d); }
+/* Whether the device can back a reserved range with physical chunks, and have
+ * those chunks registered by the NIC. */
+static inline void hapiDrvDeviceVmmSupport(hapiDrvDevice d, int* vmm, int* rdma) {
+  *vmm = *rdma = 0;
+  cuDeviceGetAttribute(vmm, CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED, d);
+  cuDeviceGetAttribute(rdma, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, d);
+}
+static inline hapiDrvResult hapiDrvMemAddressReserve(uintptr_t* out, size_t size, size_t align,
+                                                      uintptr_t hint, unsigned long long flags) {
+  CUdeviceptr p = 0;
+  const CUresult r = cuMemAddressReserve(&p, size, align, (CUdeviceptr)hint, flags);
+  *out = (uintptr_t)p;
+  return r;
+}
+static inline hapiDrvResult hapiDrvMemCreate(hapiMemGenericAllocationHandle* h, size_t size,
+                                             const hapiMemAllocationProp* prop, unsigned long long flags) {
+  return cuMemCreate(h, size, prop, flags);
+}
+static inline hapiDrvResult hapiDrvMemMap(uintptr_t at, size_t size, size_t offset,
+                                          hapiMemGenericAllocationHandle h, unsigned long long flags) {
+  return cuMemMap((CUdeviceptr)at, size, offset, h, flags);
+}
+static inline hapiDrvResult hapiDrvMemSetAccess(uintptr_t at, size_t size, const hapiMemAccessDesc* d, size_t n) {
+  return cuMemSetAccess((CUdeviceptr)at, size, d, n);
+}
+static inline hapiDrvResult hapiDrvMemGetAllocationGranularity(size_t* g, const hapiMemAllocationProp* p,
+                                                               hapiMemAllocationGranularityFlags f) {
+  return cuMemGetAllocationGranularity(g, p, f);
+}
 #endif
 
 #define hapiMemcpyKind cudaMemcpyKind
@@ -269,8 +323,9 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiStreamNonBlocking hipStreamNonBlocking
 #define hapiStreamCreateWithPriority hipStreamCreateWithPriority
 
-#define hapiMalloc(ptr, size) hipMalloc(ptr, size)
-#define hapiFree(ptr) hipFree(ptr)
+/* The vendor's allocator itself; see the CUDA table. */
+#define hapiMallocRaw(ptr, size) hipMalloc((void**)(ptr), size)
+#define hapiFreeRaw(ptr) hipFree(ptr)
 /* hapiMallocHost/hapiFreeHost are real functions, not macros, in C++.  The
  * pooled forms in hapi.h -- hapiMallocHost(ptr, size, pool) and
  * hapiFreeHost(ptr, pool) -- are overloads of these names, and a function-like
@@ -351,7 +406,87 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 #define HAPI_HAS_STREAM_GET_DEVICE 1
 #define hapiStreamGetDevice(stream, dev) hipStreamGetDevice(stream, dev)
 
+/* The device pool's virtual-memory backend; see the CUDA table. */
+#define hapiDrvDevice hipDevice_t
+#define hapiMemGenericAllocationHandle hipMemGenericAllocationHandle_t
+#define hapiMemAllocationProp hipMemAllocationProp
+#define hapiMemAccessDesc hipMemAccessDesc
+#define hapiMemAllocationGranularityFlags hipMemAllocationGranularity_flags
+#define hapiMemHandleTypeNone hipMemHandleTypeNone
+#define hapiMemLocationTypeDevice hipMemLocationTypeDevice
+#define hapiMemAllocationTypePinned hipMemAllocationTypePinned
+#define hapiMemAccessFlagsProtReadWrite hipMemAccessFlagsProtReadWrite
+#define hapiMemAllocGranularityMinimum hipMemAllocationGranularityMinimum
+#define hapiMemAllocGranularityRecommended hipMemAllocationGranularityRecommended
+#ifdef __cplusplus
+static inline hapiDrvResult hapiDrvGetErrorName(hapiDrvResult r, const char** s) { *s = hipGetErrorName(r); return hipSuccess; }
+static inline hapiDrvResult hapiDrvDeviceGet(hapiDrvDevice* d, int ordinal) { return hipDeviceGet(d, ordinal); }
+static inline hapiDrvResult hapiDrvDeviceTotalMem(size_t* bytes, hapiDrvDevice d) { return hipDeviceTotalMem(bytes, d); }
+/* HIP has no attribute for RDMA on virtual-memory chunks: it is requested,
+ * and the pool's first-chunk step-down (hapi_impl.cpp) keeps what the runtime
+ * accepts. */
+static inline void hapiDrvDeviceVmmSupport(hapiDrvDevice d, int* vmm, int* rdma) {
+  *vmm = 0; *rdma = 1;
+  if (hipDeviceGetAttribute(vmm, hipDeviceAttributeVirtualMemoryManagementSupported, (int)d) != hipSuccess) *vmm = 0;
+}
+static inline hapiDrvResult hapiDrvMemAddressReserve(uintptr_t* out, size_t size, size_t align,
+                                                      uintptr_t hint, unsigned long long flags) {
+  void* p = nullptr;
+  const hipError_t r = hipMemAddressReserve(&p, size, align, (void*)hint, flags);
+  *out = (uintptr_t)p;
+  return r;
+}
+static inline hapiDrvResult hapiDrvMemCreate(hapiMemGenericAllocationHandle* h, size_t size,
+                                             const hapiMemAllocationProp* prop, unsigned long long flags) {
+  return hipMemCreate(h, size, prop, flags);
+}
+static inline hapiDrvResult hapiDrvMemMap(uintptr_t at, size_t size, size_t offset,
+                                          hapiMemGenericAllocationHandle h, unsigned long long flags) {
+  return hipMemMap((void*)at, size, offset, h, flags);
+}
+static inline hapiDrvResult hapiDrvMemSetAccess(uintptr_t at, size_t size, const hapiMemAccessDesc* d, size_t n) {
+  return hipMemSetAccess((void*)at, size, d, n);
+}
+static inline hapiDrvResult hapiDrvMemGetAllocationGranularity(size_t* g, const hapiMemAllocationProp* p,
+                                                               hapiMemAllocationGranularityFlags f) {
+  return hipMemGetAllocationGranularity(g, p, f);
+}
+#endif
+
 #endif // CMK_HIP
+
+#if defined(CMK_CUDA) || defined(CMK_HIP)
+/* hapiMalloc / hapiFree. Under +gpupool hapiMalloc hands out a block of the
+ * device pool (no driver call) and hapiFree returns one; otherwise they are
+ * the vendor's malloc and free. A pointer that is not the pool's is always
+ * freed with the vendor's free. A vendor free waits for the device and a pool
+ * free does not: hapiFreeAsync(ptr, stream) orders the free of a pool block
+ * behind the work queued on `stream`. Implemented in hapi_impl.cpp, which
+ * also charges each allocation made inside an entry method to the running
+ * chare (the LB memory contract's footprint). The C spelling is the vendor's
+ * allocator, uncharged. */
+#ifdef __cplusplus
+hapiError_t hapiMallocImpl(void** ptr, size_t size);
+hapiError_t hapiFreeImpl(void* ptr);
+hapiError_t hapiFreeAsync(void* ptr, hapiStream_t stream);
+template <typename hapiMallocT>
+static inline hapiError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
+  void* p = nullptr;
+  const hapiError_t err = hapiMallocImpl(&p, size);
+  if (err == hapiSuccess) *ptr = (hapiMallocT*)p;
+  return err;
+}
+#define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
+#define hapiFree(ptr) hapiFreeImpl(ptr)
+#else
+#define hapiMalloc(ptr, size) hapiMallocRaw(ptr, size)
+#define hapiFree(ptr) hapiFreeRaw(ptr)
+#endif
+/* An allocation that belongs to the runtime whatever is running: an arena the
+ * pool or a comm buffer carves up, whose blocks are charged as they are
+ * handed out. Charging the arena too would bill one chare for all of it. */
+#define hapiMallocUnattributed(ptr, size) hapiMallocRaw(ptr, size)
+#endif
 
 #ifdef __cplusplus
 }  /* extern "C++" */

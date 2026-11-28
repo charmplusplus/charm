@@ -58,8 +58,15 @@ namespace buddy {
     return free;
   }
 
+  // Integer ceil(log2(size)) - 2, so bucket b holds blocks of exactly 2^(b+2).
+  // Not std::log2: this has to agree exactly with the halving in malloc(), and
+  // a floating-point result a hair either side of an integer files a block
+  // under a bucket whose nominal size it does not have.
   int allocator::get_bucket(size_t size) {
-    return (int)std::ceil(std::log2((double)size)) - 2;
+    int bucket = 0;
+    size_t block = 1;
+    while (block < size) { block <<= 1; bucket++; }
+    return bucket - 2;
   }
 
   int allocator::get_block_index(uint8_t* ptr, size_t size) {
@@ -72,8 +79,21 @@ namespace buddy {
       abort();
     }
 
-    // Request GPU memory (closest power of 2)
-    hapiError_t status = hapiMalloc(&base_ptr, _comm_lb_size);
+    // The bucket scheme assumes a power-of-two region: the top bucket is seeded
+    // with the whole of it below and malloc() reaches every smaller bucket by
+    // halving. Halving anything else truncates, and the buckets then hand out
+    // blocks smaller than they claim that overlap their neighbours.
+    if ((_comm_size & (_comm_size - 1)) != 0) {
+      fprintf(stderr,
+              "Buddy allocator communication region must be a power of two, "
+              "got %zu bytes\n", _comm_size);
+      abort();
+    }
+
+    // Request GPU memory. Unattributed and never from the device pool: the
+    // region is the runtime's (a comm buffer, or a pool arena), and the blocks
+    // carved from it are charged as they are handed out.
+    hapiError_t status = hapiMallocUnattributed(&base_ptr, _comm_lb_size);
     this->comm_size = _comm_size;
     if (status != hapiSuccess) {
       fprintf(stderr, "Failed to allocate GPU memory\n");
@@ -82,7 +102,7 @@ namespace buddy {
     DEBUG_PRINT("Initialized base_ptr %p with %zu bytes\n", (void*)base_ptr, total_size);
 
     // Initialize buckets and set up last bucket (for size min_size)
-    int total_size_log2 = std::ceil(std::log2((double)_comm_size));
+    int total_size_log2 = get_bucket(_comm_size) + 2;
     bucket_count = total_size_log2 - 1;
     buckets = new std::list<FreeBlock>[bucket_count];
     buckets[bucket_count-1].emplace_back(base_ptr, _comm_size);
@@ -131,12 +151,18 @@ namespace buddy {
 
   allocator::~allocator() {
     // Free GPU memory
-    hapiError_t status = hapiFree(base_ptr);
+    hapiError_t status = hapiFreeRaw(base_ptr);
     if (status != hapiSuccess) {
       fprintf(stderr, "Failed to free GPU memory\n");
       abort();
     }
     delete[] buckets;
+  }
+
+  size_t allocator::largest_free_block() const {
+    for (int b = bucket_count - 1; b >= 0; b--)
+      if (!buckets[b].empty()) return buckets[b].front().size;
+    return 0;
   }
 
   void* allocator::malloc(size_t request, bool is_comm) {

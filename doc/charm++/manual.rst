@@ -10475,17 +10475,40 @@ Device buffers can also be taken from a pool the runtime registers for you:
    ...
    CkDeviceFree(buf);
 
-The pool hands out buffers from arenas, large device allocations grown on
-demand (``CK_GPU_ARENA_MB`` in the environment sets the arena size, default
-256). An arena is registered with the network the first time a buffer in it
-is sent or received into, whole, and stays registered; arenas whose buffers
-never cross the network are never registered. Arenas are per device: a
-request is served from arenas on the calling PE's current device, so a
-process that drives several GPUs gets one arena set per device. Buffers from
-the pool need no release per message, and a process sending from many such
-buffers holds one registration per arena rather than one per buffer. The
-pool owns the arena, so freeing and reallocating pool buffers is safe with
-respect to registration.
+The pool hands out buffers from segments it maps once and never gives back,
+with one of two backends chosen by ``+gpupoolalloc``. The default,
+``buddy``, uses arenas, large device allocations grown on demand whose blocks
+are powers of two (``+gpupoolsize <MB>``, or ``CK_GPU_ARENA_MB`` in the
+environment, sets the arena size, default 256, rounded up to a power of two).
+``vmm`` reserves one virtual address range per device and backs it in place
+with physical chunks of ``+gpupoolchunk <MB>`` (default 256), so blocks are
+rounded only to 256 bytes and the pool grows by mapping just what a request
+is short of; ``+gpupoolreserve <MB>`` sizes the range (default twice the
+device's memory). A segment -- an arena, or under ``vmm`` the chunk holding
+the buffer -- is registered with the network the first time a buffer in it is
+sent or received into, whole, and stays registered; segments whose buffers
+never cross the network are never registered. Under ``vmm`` a buffer sent to
+another node must lie within one chunk, so ``+gpupoolchunk`` has to exceed
+the largest such buffer, and stay below 2048 MB, the largest registration the
+network accepts. The pool is per device: a request is served from the
+segments of the calling PE's device, so a process that drives several GPUs
+gets one segment set per device. Buffers from the pool need no release per
+message, and a process sending from many such buffers holds one registration
+per segment rather than one per buffer. The pool owns its segments, so
+freeing and reallocating pool buffers is safe with respect to registration.
+
+``CkDeviceFree`` returns a block at once and does not wait for device work
+that still reads it; free such a block with ``hapiFreeAsync(ptr, stream)``
+instead, which holds the block until the work queued on ``stream`` so far has
+completed.
+
+``+gpupool`` makes the pool the runtime's own allocation policy as well:
+``hapiMalloc`` and ``hapiFree`` take and return pool blocks (a pointer that
+did not come from the pool is still freed with the vendor's free), migration
+payloads and receive buffers come from the pool, and the arenas named by
+``+gpupoolarenas <n>`` (default 1; under ``vmm``, that many arena sizes
+mapped) are opened at startup, since the load balancer plans migrations only
+within the memory the pool already has.
 
 ``CkDeviceMalloc`` is for buffers that are going to be sent or received
 into, not a general device allocator. Registration is per arena and covers

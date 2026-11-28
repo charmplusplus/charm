@@ -173,100 +173,58 @@ extern "C" {
  * lifetime the runtime does not own is the network layer's job -- LCI's
  * registration cache -- not this file's.
  *
- * The one exception is memory the runtime does own.  CkDeviceMalloc(size) /
- * CkDeviceFree(ptr) hand out device buffers from arenas (buddy allocator
- * over one large device allocation each, grown on demand).  An arena is
- * registered LAZILY, whole, on the first send or receive post that lands in
- * it, so arenas that never cross the network are never pinned; the pool owns
- * the arena's lifetime, which is what makes that registration safe without
- * allocator hooks.  Registered arenas live in one interval map per process:
- * [start, end) with the layer's memory-region handle.
+ * The one exception is memory the runtime does own: the device pool
+ * (hapiDevPool* in hapi_impl.cpp), which CkDeviceMalloc(size) /
+ * CkDeviceFree(ptr) hand out and, under +gpupool, hapiMalloc and the
+ * migration runtime too.  The pool maps segments -- buddy arenas, or runs of
+ * vmm chunks -- that it never unmaps.  A segment is registered LAZILY, whole,
+ * on the first send or receive post that falls in it, so segments that never
+ * cross the network are never pinned; the pool owns the segment's lifetime,
+ * which is what makes that registration safe without allocator hooks.
+ * Registered segments live in one map per process, keyed by (base, extent)
+ * as hapiDevPoolSegmentOf names them, with the layer's memory-region handle.
  *
  * The send path (CkRdmaDeviceOnSender) and the receive path
- * (CkRdmaDeviceIssueRgets) look a buffer up by range containment; a hit
- * reuses the arena's handle and marks the buffer NODEREG so the
- * completion-time release above leaves it alone; a miss -- any buffer not
- * from the pool -- takes the per-message registration that fix (a)
- * releases.  Sweeping idle arenas is deliberately not done here (idle-time /
- * load-balancing-time work, later). */
+ * (CkRdmaDeviceIssueRgets) look a buffer up by its segment; a hit reuses the
+ * segment's handle and marks the buffer NODEREG so the completion-time
+ * release above leaves it alone; a miss -- any buffer not from the pool --
+ * takes the per-message registration that fix (a) releases. */
 #include <mutex>
 #include <map>
-#include <vector>
-#include "buddy_allocator.h"
+#include <utility>
 
-struct DeviceRegion { uintptr_t end; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
-struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; int device; };
-static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> registered arena
-static std::vector<DeviceArena> device_arenas;
+struct DeviceRegion { char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
+static std::map<std::pair<uintptr_t, size_t>, DeviceRegion> device_regions;   // (base, extent) -> registered segment
 static std::mutex device_reg_mutex;
 
-// Under device_reg_mutex.  Registers the arena on first use.
-static const DeviceRegion* deviceRegionFind(uintptr_t p, size_t cnt) {
-  auto it = device_regions.upper_bound(p);
-  if (it != device_regions.begin()) {
-    --it;
-    if (p >= it->first && p + cnt <= it->second.end) return &it->second;
-  }
-  for (auto& ar : device_arenas) {
-    if (p >= ar.start && p + cnt <= ar.end) {
-      if (!ar.registered) {
-        DeviceRegion r; r.end = ar.end;
-        CmiSetRdmaBufferInfo(r.layerInfo, (const void*)ar.start, ar.end - ar.start, CMK_BUFFER_REG);
-        ar.registered = true;
-        if (CkMyPe() == 0)
-          CmiPrintf("CkRdmaDevice> device pool arena at %p (%zu MB) registered on first use\n",
-                    (void*)ar.start, (size_t)((ar.end - ar.start) >> 20));
-        return &device_regions.emplace(ar.start, r).first->second;
-      }
-      return nullptr;  // registered arena is in the map; containment failed, so the range straddles
-    }
-  }
-  return nullptr;
-}
-
-static size_t deviceArenaBytes() {
-  static size_t bytes = 0;
-  if (!bytes) {
-    const char* e = getenv("CK_GPU_ARENA_MB");
-    bytes = (size_t)(e ? atol(e) : 256) << 20;
-  }
-  return bytes;
+// Under device_reg_mutex.  The registered segment [ptr, ptr+cnt) lies in,
+// registered on first use; null for a buffer that is not the pool's.
+static const DeviceRegion* deviceRegionFind(const void* ptr, size_t cnt) {
+  void* base = nullptr;
+  size_t extent = 0;
+  if (!hapiDevPoolSegmentOf(ptr, cnt, &base, &extent)) return nullptr;
+  if ((uintptr_t)ptr + cnt > (uintptr_t)base + extent) return nullptr;  // past what is mapped
+  const auto key = std::make_pair((uintptr_t)base, extent);
+  auto it = device_regions.find(key);
+  if (it != device_regions.end()) return &it->second;
+  DeviceRegion r;
+  CmiSetRdmaBufferInfo(r.layerInfo, base, extent, CMK_BUFFER_REG);
+  CmiPrintf("CkRdmaDevice> [%d] device pool %s at %p (%zu MB) registered on first use\n",
+            CkMyPe(), hapiDevPoolIsVmm() ? "chunk run" : "arena", base, extent >> 20);
+  return &device_regions.emplace(key, r).first->second;
 }
 
 void* CkDeviceMalloc(size_t size) {
-  // Arenas are per device: a process driving several GPUs gets one arena
-  // set per device, and a request is served only from arenas on the
-  // calling PE's current device (the device hapiMalloc would allocate on).
-  int dev = 0;
-  hapiCheck(hapiGetDevice(&dev));
-  std::lock_guard<std::mutex> g(device_reg_mutex);
-  for (auto& ar : device_arenas) {
-    if (ar.device != dev) continue;
-    void* q = ar.alloc->malloc(size, true);
-    if (q) return q;
-  }
-  size_t bytes = deviceArenaBytes();
-  while (bytes < size * 2) bytes <<= 1;
-  DeviceArena ar;
-  ar.alloc = new buddy::allocator(bytes, bytes);
-  ar.start = (uintptr_t)ar.alloc->base_ptr; ar.end = ar.start + bytes; ar.registered = false;
-  ar.device = dev;
-  device_arenas.push_back(ar);
-  if (CkMyPe() == 0)
-    CmiPrintf("CkRdmaDevice> device pool: arena %zu of %zu MB at %p on device %d (CK_GPU_ARENA_MB)\n",
-              device_arenas.size(), bytes >> 20, (void*)ar.start, dev);
-  void* q = ar.alloc->malloc(size, true);
-  if (!q) CkAbort("CkDeviceMalloc: request larger than a fresh arena");
-  return q;
+  return hapiDevPoolMalloc(size, CpvAccess(my_device_id));
 }
 
-void CkDeviceFree(void* ptr) {
-  uintptr_t p = (uintptr_t)ptr;
-  std::lock_guard<std::mutex> g(device_reg_mutex);
-  for (auto& ar : device_arenas)
-    if (p >= ar.start && p < ar.end) { ar.alloc->free(ptr); return; }
-  CkAbort("CkDeviceFree: pointer is not from the device pool");
+void* CkDeviceMallocNoGrow(size_t size) {
+  return hapiDevPoolMallocNoGrow(size, CpvAccess(my_device_id));
 }
+
+void CkDeviceFree(void* ptr) { hapiDevPoolFree(ptr); }
+
+bool CkDevicePoolOn() { return hapiDevPoolOn(); }
 
 // Initialise 'b' for ptr/cnt: from the pool arena that covers it, if any
 // (kept handle, never released per message), else registered per message
@@ -275,7 +233,7 @@ static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, 
   b.deviceRdmaOpInfo = opinfo;
   {
     std::lock_guard<std::mutex> g(device_reg_mutex);
-    const DeviceRegion* r = deviceRegionFind((uintptr_t)ptr, cnt);
+    const DeviceRegion* r = deviceRegionFind(ptr, cnt);
     if (r) {
       b.init(ptr, cnt, CMK_BUFFER_UNREG, CMK_BUFFER_NODEREG);  // common info only, no registration
       memcpy(b.layerInfo + CmiGetRdmaCommonInfoSize(), r->layerInfo, CMK_NOCOPY_DIRECT_BYTES);
