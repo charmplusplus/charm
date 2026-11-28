@@ -10,11 +10,61 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#include "LBOffThread.h"
 
 #if CMK_CUDA
 #include "hapi.h"
 #include "gpumanager.h"
 CsvExtern(GPUManager, gpu_manager);
+#endif
+
+#if CMK_LBDB_ON && LB_HELPER_AVAILABLE
+// Work handed to the LB helper thread (LBOffThread.h), polled for from the
+// scheduler loop.
+namespace {
+// The strategy's compute half. Only one at a time per process.
+struct StrategyJob {
+  CentralLB* lb;
+  BaseLB::LDStats* stats;
+  std::atomic<bool> done;
+  StrategyJob(CentralLB* l, BaseLB::LDStats* s) : lb(l), stats(s), done(false) {}
+};
+std::atomic<bool> g_strategyInFlight{false};
+
+void strategyPoll(void* arg) {
+  StrategyJob* j = (StrategyJob*)arg;
+  if (!j->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, arg);
+    return;
+  }
+  CentralLB* lb = j->lb;
+  BaseLB::LDStats* stats = j->stats;
+  delete j;
+  g_strategyInFlight.store(false);
+  lb->strategyFinishOffThread(stats);
+}
+
+#if CMK_CUDA
+// The round's CUPTI load build, then the fan-out to the process's PEs.
+struct CuptiBuildJob {
+  CkGroupID gid;
+  int first, count;
+  std::atomic<bool> done;
+  CuptiBuildJob(CkGroupID g, int f, int c) : gid(g), first(f), count(c), done(false) {}
+};
+
+void cuptiBuildPoll(void* arg) {
+  CuptiBuildJob* b = (CuptiBuildJob*)arg;
+  if (!b->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, arg);
+    return;
+  }
+  CProxy_CentralLB proxy(b->gid);
+  for (int r = 0; r < b->count; r++) proxy[b->first + r].gpuLoadsReady();
+  delete b;
+}
+#endif
+}  // namespace
 #endif
 
 #define  DEBUGF(x)       // CmiPrintf x;
@@ -162,6 +212,25 @@ void CentralLB::InvokeLB()
   // kernel the other PEs' objects were still finishing. The earlier arrivals
   // continue from gpuLoadsReady.
   if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+#if LB_HELPER_AVAILABLE
+  {
+    // Parsing the round's CUPTI records can take tens of milliseconds; on the
+    // helper thread this PE keeps scheduling meanwhile, which matters under
+    // +LBAsync, where its elements are still running.
+    static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
+    cpu_set_t cpus;
+    if (lbOffThreadCpus(spec, &cpus)) {
+      CuptiBuildJob* b =
+          new CuptiBuildJob(thisgroup, CkNodeFirst(CkMyNode()), CkNodeSize(CkMyNode()));
+      lbHelperSubmit(cpus, [b]() {
+        hapiPrepareCuptiLoads();
+        b->done.store(true, std::memory_order_release);
+      });
+      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
+      return;
+    }
+  }
+#endif
   hapiPrepareCuptiLoads();
   const int first = CkNodeFirst(CkMyNode());
   for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
@@ -670,9 +739,43 @@ void CentralLB::LoadBalance()
 //      }
   }
   
+#if LB_HELPER_AVAILABLE
+  {
+    // The strategy's compute on the helper thread: this PE goes on delivering
+    // messages to its own elements meanwhile, which under +LBAsync keeps their
+    // neighbours from waiting on them for the length of the strategy.
+    static const char* spec = lbHelperSpec("CHARM_LB_STRATEGY_THREAD");
+    cpu_set_t cpus;
+    if (strategyOffThreadOk && !concurrent && !use_thread && !g_strategyInFlight.load() &&
+        lbOffThreadCpus(spec, &cpus)) {
+      g_strategyInFlight.store(true);
+      strat_start_time = CkWallTimer();
+      StrategyJob* j = new StrategyJob(this, statsData);
+      lbHelperSubmit(cpus, [j]() {
+        j->lb->strategyCompute(j->stats);
+        j->done.store(true, std::memory_order_release);
+      });
+      CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, (void*)j);
+      return;  // strategyFinishOffThread applies the decision
+    }
+  }
+#endif
   storedMigrateMsg = Strategy(statsData);
 
   if (!concurrent) ApplyDecision(); // immediately apply the migration decision
+#endif
+}
+
+// The strategy's compute finished on the helper thread: the decision message
+// reads PE-local state, so it is built here, on the PE.
+void CentralLB::strategyFinishOffThread(LDStats* stats)
+{
+#if CMK_LBDB_ON
+  if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
+    CkPrintf("CharmLB> %s: strategy ran %.1f ms on the helper thread\n", lbname,
+             (CkWallTimer() - strat_start_time) * 1e3);
+  storedMigrateMsg = strategyFinish(stats);
+  if (!concurrent) ApplyDecision();
 #endif
 }
 
@@ -1364,6 +1467,18 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
   strat_start_time = CkWallTimer();
+  strategyCompute(stats);
+  return strategyFinish(stats);
+#else
+  return NULL;
+#endif
+}
+
+// On the helper thread this runs off any PE: CkMyPe() reads 0 there, so the
+// prints below keyed on the decision PE still appear when that PE is 0.
+void CentralLB::strategyCompute(LDStats* stats)
+{
+#if CMK_LBDB_ON
   if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
     CkPrintf("CharmLB> %s: PE [%d] strategy starting at %f\n", lbname, cur_ld_balancer, strat_start_time);
 
@@ -1375,7 +1490,12 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     for (const auto& val : stats->to_proc) CkPrintf("%d ", val);
     CkPrintf("\n");
   }
+#endif
+}
 
+LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
+{
+#if CMK_LBDB_ON
   if (concurrent) return NULL;  // migrate msg will only be created on PE with best solution
 
   LBMigrateMsg *msg = createMigrateMsg(stats);

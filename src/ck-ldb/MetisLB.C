@@ -26,6 +26,8 @@ static void lbinit()
 MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
+  // work() reads only its stats and _lb_args: safe on the LB helper thread.
+  strategyOffThreadOk = true;
   if (CkMyPe() == 0 && !quietModeRequested)
     CkPrintf("CharmLB> MetisLB created.\n");
 }
