@@ -102,14 +102,16 @@ public:
     size_t gpu_pool_arena_bytes;
     size_t gpu_pool_capacity_bytes;
     int gpu_ipc_slots;
+#endif
     /// GPU this PE is mapped to, as (physical node id << 32 | device index),
     /// so that the same physical device is one value across every process that
-    /// shares it. -1 when this PE has no GPU. PEs with equal values form the
-    /// GPU group a GPU-aware strategy balances across.
+    /// shares it. -1 when this PE has no GPU, and on every PE of a build
+    /// without one, so a strategy that groups PEs by device sees one group.
+    /// PEs with equal values form the GPU group a GPU-aware strategy balances
+    /// across.
     uint64_t gpu_device_id;
     /// SM count of that GPU, 0 if it could not be queried.
     int gpu_total_sms;
-#endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
@@ -117,8 +119,8 @@ public:
 #if CMK_GPU
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
-		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
 #endif
+		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
 	   	 bg_walltime(0.0), pe(-1), partition(-1), available(true) {}
     inline void clearBgLoad() {
       idletime = bg_walltime = 
